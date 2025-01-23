@@ -1,0 +1,236 @@
+文件源代码内容如下：
+
+
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SelectedCardSpawner : MonoBehaviour
+{
+    public GameObject selectedCardPrefab;
+    public Transform contentParent;
+    private List<CardInfo> existingCards = new List<CardInfo>();
+
+    public static SelectedCardSpawner Instance { get; private set; }
+
+    void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    public List<CardInfo> ExistingCards => existingCards;
+
+    public void SpawnSelectedCard(
+        string id,
+        string name,
+        string description,
+        string height,
+        string version,
+        string prefabPath,
+        string thumbnailPath, // 确保传递缩略图路径
+        string typeTags,
+        string themeTags,
+        string functionTags,
+        string definitionTags,
+        string batchTags,
+        string propertyTags,
+        string modelFaces,
+        string creationDate,
+        string updatedDate
+    )
+    {
+
+        CardInfo newCard = new CardInfo(
+            id,
+            name,
+            description,
+            height,
+            version,
+            prefabPath,
+            thumbnailPath,
+            typeTags,
+            themeTags,
+            functionTags,
+            definitionTags,
+            batchTags,
+            propertyTags,
+            modelFaces,
+            creationDate,
+            updatedDate
+        );
+
+        // 检查是否已经存在完全相同的卡片
+        if (existingCards.Contains(newCard))
+        {
+            return;
+        }
+
+        // 不存在完全相同的卡片，进行实例化和设置
+        GameObject selectedCard = Instantiate(selectedCardPrefab, contentParent);
+        SelectedCardUI selectedCardUI = selectedCard.GetComponent<SelectedCardUI>();
+        if (selectedCardUI != null)
+        {
+            selectedCardUI.SetupCard(
+                id,
+                name,
+                description,
+                height,
+                version,
+                prefabPath,
+                thumbnailPath, // 确保传递缩略图路径
+                typeTags,
+                themeTags,
+                functionTags,
+                definitionTags,
+                batchTags,
+                propertyTags,
+                modelFaces,
+                creationDate,
+                updatedDate
+            );
+            existingCards.Add(newCard); // 添加到已存在卡片列表中
+        }
+    }
+
+
+    public void RemoveCardInfo(CardInfo cardInfo)
+    {
+        if (existingCards.Contains(cardInfo))
+        {
+            existingCards.Remove(cardInfo);
+        }
+    }
+
+    public void DeleteAllCards()
+    {
+        // 遍历contentParent的所有子物体并销毁它们
+        foreach (Transform child in contentParent)
+        {
+            Destroy(child.gameObject);
+        }
+
+        // 清空维护已存在卡片的列表
+        existingCards.Clear();
+    }
+}
+
+源代码内容解释如下：
+### 1. 功能概览
+
+**功能定位**  
+`SelectedCardSpawner` 是一个负责在 Unity 场景中生成和管理选中卡片实例的类。它主要用于展示和维护卡片信息，确保卡片实例的唯一性和有序性。
+
+**角色和重要性**  
+这个类在系统中扮演卡片展示管理者的角色，确保卡片信息的正确性和一致性。它通过单例模式（Singleton Pattern）提供全局访问，避免重复实例化，确保系统资源的高效利用和稳定性。
+
+**主要特性与技术实现**  
+- **单例模式**：确保只有一个实例存在，保证全局唯一性。  
+- **卡片实例化**：根据提供的参数生成卡片实例，并设置其属性。  
+- **重复检查**：避免生成重复的卡片实例，确保卡片信息的唯一性。  
+- **卡片删除**：支持删除单个卡片实例或所有卡片实例，清理资源。
+
+### 2. 核心类解析
+
+**类名称**：`SelectedCardSpawner`  
+
+- **职责说明**：  
+  该类的主要职责是管理选中卡片的生成和删除。它通过单例模式提供全局访问，确保卡片实例的唯一性和有序性。  
+
+- **关键方法清单**：  
+  - `public void SpawnSelectedCard(...)`：生成新的卡片实例。  
+  - `public void RemoveCardInfo(CardInfo cardInfo)`：删除指定的卡片信息。  
+  - `public void DeleteAllCards()`：删除所有卡片实例并清理数据。  
+
+- **继承关系**：  
+  `SelectedCardSpawner -> MonoBehaviour`  
+
+- **依赖模块**：  
+  - `UnityEngine`：用于游戏对象操作和 Unity 引擎功能。  
+
+### 3. 关键方法详解
+
+#### 方法 1：`public void SpawnSelectedCard(...)`
+
+- **方法签名**：  
+  ```csharp
+  public void SpawnSelectedCard(
+      string id,
+      string name,
+      string description,
+      string height,
+      string version,
+      string prefabPath,
+      string thumbnailPath,
+      string typeTags,
+      string themeTags,
+      string functionTags,
+      string definitionTags,
+      string batchTags,
+      string propertyTags,
+      string modelFaces,
+      string creationDate,
+      string updatedDate
+  )
+  ```
+
+- **功能描述**：  
+  该方法根据提供的参数生成一个新的卡片实例，并将其添加到现有的卡片列表中。它首先检查是否已经存在完全相同的卡片，如果存在则跳过生成；否则，生成新的卡片实例并设置其属性。
+
+- **算法说明**：  
+  使用 `CardInfo` 类的 `Contains` 方法检查是否存在重复卡片。如果不存在，则实例化卡片Prefab，并调用 `SelectedCardUI` 的 `SetupCard` 方法设置卡片属性。
+
+- **调用关系**：  
+  通常在需要生成新卡片时调用，例如用户选择一张新卡片或系统需要展示新卡片信息时。调用频率取决于卡片生成的频率。
+
+#### 方法 2：`public void RemoveCardInfo(CardInfo cardInfo)`
+
+- **方法签名**：  
+  ```csharp
+  public void RemoveCardInfo(CardInfo cardInfo)
+  ```
+
+- **功能描述**：  
+  该方法从现有的卡片列表中删除指定的卡片信息。它主要用于清理不再需要的卡片数据。
+
+- **算法说明**：  
+  使用 `List<CardInfo>` 的 `Remove` 方法从列表中删除指定的卡片信息。
+
+- **调用关系**：  
+  通常在需要删除单个卡片时调用，例如用户取消选择一张卡片或系统需要清理过时的卡片信息时。调用频率取决于卡片删除的频率。
+
+#### 方法 3：`public void DeleteAllCards()`
+
+- **方法签名**：  
+  ```csharp
+  public void DeleteAllCards()
+  ```
+
+- **功能描述**：  
+  该方法删除所有现有的卡片实例，并清空维护卡片信息的列表。它用于批量清理所有卡片数据。
+
+- **算法说明**：  
+  遍历 `contentParent` 的所有子物体并销毁它们，然后清空 `existingCards` 列表。
+
+- **调用关系**：  
+  通常在需要清理所有卡片时调用，例如系统重置或用户退出当前场景时。调用频率较低，但可能在关键节点被调用。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class MonoBehaviour
+    class SelectedCardSpawner
+    SelectedCardSpawner --|> MonoBehaviour : 继承
+    SelectedCardSpawner --> UnityEngine : 依赖
+    SelectedCardSpawner --> UnityEngine.UI : 依赖
+```
+
+**说明**：  
+- **继承关系**：`SelectedCardSpawner` 继承自 `MonoBehaviour`，这是 Unity 引擎中的基类。  
+- **依赖关系**：`SelectedCardSpawner` 依赖 `UnityEngine` 模块（用于游戏对象操作）和 `UnityEngine.UI` 模块（用于 UI 组件操作）。

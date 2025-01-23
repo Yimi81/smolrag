@@ -1,0 +1,627 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using UnityEditor;
+using UnityEngine;
+
+/// <summary>
+/// 给所有携带ResourceInfo的物体，整体更新一次长宽高计算，并提供复制、粘贴、清除标签的功能
+/// </summary>
+public class ResourceInfoUpdater : EditorWindow
+{
+    private HashSet<string> directories = new HashSet<string>(); // 存储拖拽的文件夹路径
+    private HashSet<string> specificPrefabPaths = new HashSet<string>(); // 存储直接粘贴的预制体路径
+    private string pastedPathsText = string.Empty; // 存储粘贴区域的文本
+    private Vector2 scrollPosition; // 滚动视图的位置
+    // 用于保存复制的标签
+    private Dictionary<string, List<string>> copiedTags = new Dictionary<string, List<string>>();
+
+    [MenuItem("ZTResource/Tools/更新-长宽高", false, 9)]
+    public static void ShowWindow()
+    {
+        GetWindow<ResourceInfoUpdater>("ResourceInfo编辑工具");
+    }
+
+    private void OnGUI()
+    {
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition); // 开始滚动视图
+
+        GUILayout.Label("更新所有预制体信息", EditorStyles.boldLabel);
+
+        // 显示拖拽区域
+        GUILayout.Label("拖拽文件夹到这里:");
+        HandleDragAndDrop();
+
+        // 显示当前已添加的文件夹
+        GUILayout.Label("已添加的文件夹:");
+        DisplayPathsWithRemoveButton(directories.ToList(), directories);
+
+        GUILayout.Space(10);
+
+        // 新增的粘贴区域
+        GUILayout.Label("直接粘贴预制体路径:");
+        pastedPathsText = EditorGUILayout.TextArea(pastedPathsText, GUILayout.Height(60));
+        if (GUILayout.Button("添加粘贴的路径"))
+        {
+            AddPastedPaths();
+        }
+
+        // 显示已添加的直接粘贴的预制体路径
+        if (specificPrefabPaths.Count > 0)
+        {
+            GUILayout.Label("已添加的预制体路径:");
+            DisplayPathsWithRemoveButton(specificPrefabPaths.ToList(), specificPrefabPaths);
+        }
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button("ALL更新信息"))
+        {
+            UpdateAllResourceInfo();
+        }
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button("复制标签"))
+        {
+            CopyTagsFromSelected();
+        }
+
+        if (GUILayout.Button("粘贴标签"))
+        {
+            PasteTagsToSelected();
+        }
+
+        if (GUILayout.Button("清除所有标签"))
+        {
+            ClearAllTagsFromSelected();
+        }
+
+        EditorGUILayout.EndScrollView(); // 结束滚动视图
+    }
+
+    private void HandleDragAndDrop()
+    {
+        Event evt = Event.current;
+        Rect dropArea = GUILayoutUtility.GetRect(0.0f, 50.0f, GUILayout.ExpandWidth(true));
+        GUI.Box(dropArea, "拖拽文件夹或预制体到这里");
+
+        switch (evt.type)
+        {
+            case EventType.DragUpdated:
+            case EventType.DragPerform:
+                if (!dropArea.Contains(evt.mousePosition))
+                    return;
+
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+                if (evt.type == EventType.DragPerform)
+                {
+                    DragAndDrop.AcceptDrag();
+
+                    foreach (string draggedObject in DragAndDrop.paths)
+                    {
+                        if (Directory.Exists(draggedObject))
+                        {
+                            // 如果是文件夹，添加文件夹路径
+                            directories.Add(draggedObject);
+                        }
+                        else if (draggedObject.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // 如果是预制体，添加预制体路径
+                            specificPrefabPaths.Add(draggedObject);
+                        }
+                    }
+                }
+                Event.current.Use();
+                break;
+        }
+    }
+
+    private void AddPastedPaths()
+    {
+        if (string.IsNullOrWhiteSpace(pastedPathsText))
+        {
+            Debug.LogWarning("粘贴区域为空！");
+            return;
+        }
+
+        string[] paths = pastedPathsText.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        int addedCount = 0;
+
+        foreach (string path in paths)
+        {
+            string trimmedPath = path.Trim();
+            if (trimmedPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(trimmedPath) != null)
+                {
+                    if (specificPrefabPaths.Add(trimmedPath))
+                    {
+                        addedCount++;
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"无效的预制体路径：{trimmedPath}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"路径不是预制体文件：{trimmedPath}");
+            }
+        }
+
+        pastedPathsText = string.Empty; // 清空粘贴区域
+        if (addedCount > 0)
+        {
+            Debug.Log($"成功添加了 {addedCount} 个预制体路径！");
+        }
+        else
+        {
+            Debug.LogWarning("没有有效的预制体路径被添加！");
+        }
+    }
+
+    private void UpdateAllResourceInfoDimensions()
+    {
+        List<string> allFiles = GetAllPrefabPaths();
+        int updatedCount = 0;
+
+        foreach (string path in allFiles)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+                continue;
+
+            ResourceInfo resourceInfo = prefab.GetComponent<ResourceInfo>();
+            if (resourceInfo != null)
+            {
+                string dimensions = CalculatePrefabDimensions(prefab);
+                resourceInfo.itemHeight = dimensions;
+
+                EditorUtility.SetDirty(resourceInfo);
+                updatedCount++;
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"更新了 {updatedCount} 个预制体的尺寸。");
+    }
+
+    private void UpdateAllResourceInfo()
+    {
+        List<string> allFiles = GetAllPrefabPaths();
+        int updatedCount = 0;
+
+        foreach (string path in allFiles)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+                continue;
+
+            ResourceInfo resourceInfo = prefab.GetComponent<ResourceInfo>();
+            if (resourceInfo != null)
+            {
+                RefreshThumbnail(resourceInfo);
+                RefreshData(resourceInfo);
+
+                EditorUtility.SetDirty(resourceInfo);
+                updatedCount++;
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"更新了 {updatedCount} 个预制体的信息。");
+    }
+
+
+    private List<string> GetAllPrefabPaths()
+    {
+        List<string> allFiles = new List<string>();
+        foreach (string directory in directories)
+        {
+            allFiles.AddRange(Directory.GetFiles(directory, "*.prefab", SearchOption.AllDirectories));
+        }
+
+        allFiles.AddRange(specificPrefabPaths);
+
+        // 去重
+        return allFiles.Distinct().ToList();
+    }
+
+    private void RefreshData(ResourceInfo resourceInfo)
+    {
+        if (resourceInfo != null && resourceInfo.gameObject != null)
+        {
+            // 获取预制体的路径并去除公共部分和文件后缀
+            string prefabPath = AssetDatabase.GetAssetPath(resourceInfo.gameObject);
+            string basePath = "Assets/ArtResource/Scenes/Standard/";
+
+            // 去掉公共部分路径
+            if (prefabPath.StartsWith(basePath))
+            {
+                prefabPath = prefabPath.Substring(basePath.Length);
+            }
+
+            // 去除文件后缀
+            string prefabPathWithoutExtension = Path.ChangeExtension(prefabPath, null);
+            resourceInfo.id = prefabPathWithoutExtension;
+
+            string facesCount = CalculateModelFaces(resourceInfo.gameObject);
+            resourceInfo.modelFaces = facesCount;
+
+            string dimensions = CalculatePrefabDimensions(resourceInfo.gameObject);
+            resourceInfo.itemHeight = dimensions;
+        }
+    }
+
+    private void RefreshThumbnail(ResourceInfo resourceInfo)
+    {
+        if (resourceInfo == null)
+        {
+            Debug.LogWarning("ResourceInfo 脚本未找到！");
+            return;
+        }
+
+        // 获取预制体的路径
+        string prefabPath = AssetDatabase.GetAssetPath(resourceInfo.gameObject);
+        if (string.IsNullOrEmpty(prefabPath) || !prefabPath.EndsWith(".prefab"))
+        {
+            Debug.LogWarning("无法找到预制体的路径，或者选择的不是一个预制体！");
+            return;
+        }
+
+        // 去除公共部分路径
+        string basePath = "Assets/ArtResource/Scenes/Standard/";
+        if (prefabPath.StartsWith(basePath))
+        {
+            prefabPath = prefabPath.Substring(basePath.Length);
+        }
+
+        // 删除路径中的“/”符号
+        string modifiedPrefabPath = prefabPath.Replace("/", "");
+
+        // 去除文件后缀
+        string prefabName = Path.GetFileNameWithoutExtension(modifiedPrefabPath);
+
+        // 构建缩略图路径
+        string thumbnailPath = $"Assets/ZTResource/Resources/ZT_IconTextures/{prefabName}.png";
+        Texture2D newThumbnail = AssetDatabase.LoadAssetAtPath<Texture2D>(thumbnailPath);
+
+        if (newThumbnail)
+        {
+            resourceInfo.thumbnailPath = prefabName;
+            EditorUtility.SetDirty(resourceInfo);
+
+            Debug.Log("缩略图已更新！");
+        }
+        else
+        {
+            Debug.LogWarning($"未找到缩略图文件：{thumbnailPath}");
+        }
+    }
+
+    private string CalculateModelFaces(GameObject prefab)
+    {
+        int totalFaces = 0;
+        MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>();
+        foreach (MeshFilter meshFilter in meshFilters)
+        {
+            if (meshFilter.sharedMesh != null)
+            {
+                totalFaces += meshFilter.sharedMesh.triangles.Length / 3;
+            }
+        }
+        return totalFaces.ToString();
+    }
+
+    private string CalculatePrefabDimensions(GameObject prefab)
+    {
+        Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>();
+
+        if (renderers.Length == 0)
+        {
+            Debug.Log("预制体中没有找到任何模型");
+            return string.Empty;
+        }
+
+        Bounds overallBounds = renderers[0].bounds;
+
+        foreach (Renderer renderer in renderers)
+        {
+            overallBounds.Encapsulate(renderer.bounds);
+        }
+
+        float length = Mathf.Round(overallBounds.size.x * 10) / 10f;
+        float width = Mathf.Round(overallBounds.size.z * 10) / 10f;
+        float height = Mathf.Round(overallBounds.size.y * 10) / 10f;
+
+        return $"{length}|{width}|{height}";
+    }
+
+    private void DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet)
+    {
+        for (int i = 0; i < paths.Count; i++)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(paths[i]);
+            if (GUILayout.Button("移除", GUILayout.Width(60)))
+            {
+                pathSet.Remove(paths[i]);
+            }
+            GUILayout.EndHorizontal();
+        }
+    }
+
+    // 复制标签
+    private void CopyTagsFromSelected()
+    {
+        copiedTags.Clear();
+
+        GameObject[] selectedObjects = Selection.gameObjects;
+        if (selectedObjects.Length == 0)
+        {
+            Debug.LogWarning("没有选中的预制体！");
+            return;
+        }
+
+        ResourceInfo resourceInfo = selectedObjects[0].GetComponent<ResourceInfo>();
+        if (resourceInfo == null)
+        {
+            Debug.LogWarning("选中的对象没有ResourceInfo组件！");
+            return;
+        }
+
+        copiedTags["TypeTags"] = new List<string>(resourceInfo.typeTags);
+        copiedTags["ThemeTags"] = new List<string>(resourceInfo.themeTags);
+        copiedTags["DefinitionTags"] = new List<string>(resourceInfo.definitionTags);
+        copiedTags["FunctionTags"] = new List<string>(resourceInfo.functionTags);
+        copiedTags["BatchTags"] = new List<string>(resourceInfo.batchTags);
+        copiedTags["PropertyTags"] = new List<string>(resourceInfo.propertyTags);
+
+        Debug.Log("标签已复制！");
+    }
+
+    // 粘贴标签
+    private void PasteTagsToSelected()
+    {
+        if (copiedTags.Count == 0)
+        {
+            Debug.LogWarning("没有复制的标签可粘贴！");
+            return;
+        }
+
+        GameObject[] selectedObjects = Selection.gameObjects;
+        if (selectedObjects.Length == 0)
+        {
+            Debug.LogWarning("没有选中的预制体！");
+            return;
+        }
+
+        foreach (GameObject selectedObject in selectedObjects)
+        {
+            ResourceInfo resourceInfo = selectedObject.GetComponent<ResourceInfo>();
+            if (resourceInfo == null)
+            {
+                Debug.LogWarning($"选中的对象 {selectedObject.name} 没有ResourceInfo组件！");
+                continue;
+            }
+
+            PasteTagsToList(ref resourceInfo.typeTags, "TypeTags");
+            PasteTagsToList(ref resourceInfo.themeTags, "ThemeTags");
+            PasteTagsToList(ref resourceInfo.definitionTags, "DefinitionTags");
+            PasteTagsToList(ref resourceInfo.functionTags, "FunctionTags");
+            PasteTagsToList(ref resourceInfo.batchTags, "BatchTags");
+            PasteTagsToList(ref resourceInfo.propertyTags, "PropertyTags");
+
+            EditorUtility.SetDirty(resourceInfo);
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log("标签已粘贴到选中的所有预制体！");
+    }
+
+    // 清除所有标签
+    private void ClearAllTagsFromSelected()
+    {
+        GameObject[] selectedObjects = Selection.gameObjects;
+        if (selectedObjects.Length == 0)
+        {
+            Debug.LogWarning("没有选中的预制体！");
+            return;
+        }
+
+        foreach (GameObject selectedObject in selectedObjects)
+        {
+            ResourceInfo resourceInfo = selectedObject.GetComponent<ResourceInfo>();
+            if (resourceInfo == null)
+            {
+                Debug.LogWarning($"选中的对象 {selectedObject.name} 没有ResourceInfo组件！");
+                continue;
+            }
+
+            ClearTagsList(ref resourceInfo.typeTags);
+            ClearTagsList(ref resourceInfo.themeTags);
+            ClearTagsList(ref resourceInfo.definitionTags);
+            ClearTagsList(ref resourceInfo.functionTags);
+            ClearTagsList(ref resourceInfo.batchTags);
+            ClearTagsList(ref resourceInfo.propertyTags);
+
+            EditorUtility.SetDirty(resourceInfo);
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log("已清除选中预制体的所有标签！");
+    }
+
+    private void PasteTagsToList(ref List<string> tags, string tagType)
+    {
+        if (tags == null)
+        {
+            tags = new List<string>();
+        }
+
+        tags.Clear();
+        if (copiedTags.ContainsKey(tagType))
+        {
+            tags.AddRange(copiedTags[tagType]);
+        }
+    }
+
+    private void ClearTagsList(ref List<string> tags)
+    {
+        if (tags != null)
+        {
+            tags.Clear();
+        }
+    }
+}
+
+#endif
+
+源代码内容解释如下：
+### 1. 功能概览
+
+- **功能定位**：ResourceInfoUpdater 是一个 Unity 编辑器扩展工具，用于批量更新预制体（Prefab）的尺寸信息、标签以及缩略图。它允许用户通过拖放文件夹或直接粘贴路径来添加需要处理的预制体，并提供复制、粘贴和清除标签的功能。
+
+- **角色和重要性**：该工具在项目中扮演辅助开发的角色，帮助开发者高效地管理预制体的元数据，提升开发效率。它通过自动化处理预制体信息，减少了手动操作的错误率和时间成本。
+
+- **主要特性与技术实现**：
+  - **批量处理**：支持通过拖放文件夹或粘贴路径来批量处理多个预制体。
+  - **尺寸计算**：自动计算预制体的长宽高，并更新到 ResourceInfo 组件。
+  - **标签管理**：提供复制、粘贴和清除标签的功能，便于统一管理预制体的分类信息。
+  - **缩略图更新**：根据预制体路径自动更新缩略图路径。
+  - **技术实现**：使用 Unity 的 Editor API（如 AssetDatabase、EditorWindow）和文件处理技术实现功能。
+
+---
+
+### 2. 核心类解析
+
+#### `ResourceInfoUpdater`
+
+- **职责说明**：该类的主要职责是提供一个自定义编辑器窗口，允许用户拖放文件夹或粘贴预制体路径，批量更新预制体的尺寸信息、标签和缩略图。它通过与 Unity 编辑器的交互，实现对预制体资源的高效管理。
+
+- **关键方法清单**：
+  - `OnGUI()`：绘制编辑器窗口的界面。
+  - `HandleDragAndDrop()`：处理拖放事件，添加文件夹或预制体路径。
+  - `UpdateAllResourceInfo()`：更新所有预制体的尺寸信息、标签和缩略图。
+  - `CopyTagsFromSelected()`、`PasteTagsToSelected()`、`ClearAllTagsFromSelected()`：管理预制体标签的复制、粘贴和清除操作。
+  - `CalculatePrefabDimensions()`：计算预制体的尺寸。
+
+- **继承关系**：
+  ```
+  ResourceInfoUpdater -> EditorWindow -> Object
+  ```
+
+- **依赖模块**：
+  - `UnityEngine`：用于访问 Unity 引擎的核心功能。
+  - ` UnityEditor`：用于访问 Unity 编辑器的扩展 API。
+  - `ResourceInfo`：预制体上附带的自定义组件，用于存储元数据。
+
+---
+
+### 3. 关键方法详解
+
+#### `OnGUI()`
+
+- **方法签名**：`private void OnGUI()`
+- **功能描述**：绘制编辑器窗口的界面，包括拖放区域、路径显示、按钮操作（更新信息、复制/粘贴/清除标签）等。
+- **调用关系**：由 Unity 编辑器自动调用，作为编辑器窗口的核心绘制方法，频率为每帧一次。
+
+#### `HandleDragAndDrop()`
+
+- **方法签名**：`private void HandleDragAndDrop()`
+- **功能描述**：处理拖放事件，允许用户拖放文件夹或预制体路径到编辑器窗口中。根据拖放内容的类型（文件夹或预制体），将其路径存储到相应的集合中。
+- **调用关系**：在 `OnGUI()` 中被调用，当用户进行拖放操作时触发。
+
+#### `UpdateAllResourceInfo()`
+
+- **方法签名**：`private void UpdateAllResourceInfo()`
+- **功能描述**：遍历所有已添加的预制体路径，更新每个预制体的 ResourceInfo 组件，包括尺寸信息、标签和缩略图。
+- **调用关系**：由 `OnGUI()` 中的按钮点击事件触发，每次点击按钮时执行一次。
+
+#### `CopyTagsFromSelected()`
+
+- **方法签名**：`private void CopyTagsFromSelected()`
+- **功能描述**：复制选中预制体的标签信息到一个字典中，以便后续粘贴。
+- **调用关系**：由 `OnGUI()` 中的“复制标签”按钮点击事件触发。
+
+#### `PasteTagsToSelected()`
+
+- **方法签名**：`private void PasteTagsToSelected()`
+- **功能描述**：将之前复制的标签信息粘贴到选中的预制体的 ResourceInfo 组件中。
+- **调用关系**：由 `OnGUI()` 中的“粘贴标签”按钮点击事件触发。
+
+#### `ClearAllTagsFromSelected()`
+
+- **方法签名**：`private void ClearAllTagsFromSelected()`
+- **功能描述**：清除选中预制体的 ResourceInfo 组件中的所有标签信息。
+- **调用关系**：由 `OnGUI()` 中的“清除所有标签”按钮点击事件触发。
+
+#### `CalculatePrefabDimensions(GameObject prefab)`
+
+- **方法签名**：`private string CalculatePrefabDimensions(GameObject prefab)`
+- **功能描述**：计算预制体的包围盒尺寸，并将其格式化为“长度|宽度|高度”的字符串。
+- **算法说明**：遍历预制体的所有 Renderer 组件，计算它们的包围盒，最终得到整体包围盒的尺寸。
+- **调用关系**：在 `UpdateAllResourceInfo()` 和 `RefreshData()` 中被调用，频率取决于需要更新的预制体数量。
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class ResourceInfoUpdater {
+        <<EditorWindow>>
+        +HashSet<string> directories
+        +HashSet<string> specificPrefabPaths
+        +Dictionary<string, List<string>> copiedTags
+        +OnGUI()
+        +HandleDragAndDrop()
+        +UpdateAllResourceInfo()
+        +CopyTagsFromSelected()
+        +PasteTagsToSelected()
+        +ClearAllTagsFromSelected()
+        +CalculatePrefabDimensions(GameObject)
+    }
+
+    class EditorWindow {
+        <<Abstract>>
+    }
+
+    class Object {
+        <<Abstract>>
+    }
+
+    ResourceInfoUpdater --> EditorWindow
+    EditorWindow --> Object
+
+    class AssetDatabase {
+        <<Static>>
+        +LoadAssetAtPath<T>(string)
+        +SaveAssets()
+        +Refresh()
+    }
+
+    class ResourceInfo {
+        +string id
+        +string itemHeight
+        +string thumbnailPath
+        +List<string> typeTags
+        +List<string> themeTags
+        +List<string> definitionTags
+        +List<string> functionTags
+        +List<string> batchTags
+        +List<string> propertyTags
+    }
+
+    ResourceInfoUpdater --> AssetDatabase
+    ResourceInfoUpdater --> ResourceInfo
+```

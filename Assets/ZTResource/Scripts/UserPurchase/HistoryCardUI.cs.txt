@@ -1,0 +1,424 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.Linq;
+
+public class HistoryCardUI : MonoBehaviour
+{
+    public TextMeshProUGUI idText;
+    public TextMeshProUGUI nameText;
+    public TextMeshProUGUI descriptionText;
+    public TextMeshProUGUI heightText;
+    public TextMeshProUGUI versionText;
+    public TextMeshProUGUI totalVersionText; // 新增总表版本号
+    public TextMeshProUGUI prefabPathText;
+    public Image thumbnailImage;
+    public TextMeshProUGUI typeTagsText;
+    public TextMeshProUGUI themeTagsText;
+    public TextMeshProUGUI functionTagsText;
+    public TextMeshProUGUI definitionTagsText;
+    public TextMeshProUGUI batchTagsText;
+    public TextMeshProUGUI propertyTagsText;
+    public TextMeshProUGUI modelFacesText;
+    public TextMeshProUGUI creationDateText;
+    public TextMeshProUGUI updatedDateText;
+    public Button deleteButton;
+    public Button addButton;
+
+    // 新增用于显示更新提示的UI实例
+    public GameObject updateNotification;
+
+    public GameObject targetParent;
+    public ItemDetailsDisplay itemDetailsDisplay;
+    public CSVParser cSVParser;
+    public ResourceManager resourceManager; // 需要引用 ResourceManager
+
+    private static HistoryCardUI currentSelectedCard;
+
+    private string thumbnailPath;
+    public string csvFilePath;
+
+    public void SetupCard(
+        string id,
+        string name,
+        string description,
+        string height,
+        string version,
+        string prefabPath,
+        string thumbnailPath,
+        string typeTags,
+        string themeTags,
+        string functionTags,
+        string definitionTags,
+        string batchTags,
+        string propertyTags,
+        string modelFaces,
+        string creationDate,
+        string updatedDate,
+        string csvFilePath
+    )
+    {
+        idText.text = id;
+        nameText.text = name;
+        descriptionText.text = description;
+        heightText.text = height;
+        versionText.text = version;
+        prefabPathText.text = prefabPath;
+        typeTagsText.text = typeTags;
+        themeTagsText.text = themeTags;
+        functionTagsText.text = functionTags;
+        definitionTagsText.text = definitionTags;
+        batchTagsText.text = batchTags;
+        propertyTagsText.text = propertyTags;
+        modelFacesText.text = modelFaces;
+        creationDateText.text = creationDate;
+        updatedDateText.text = updatedDate;
+
+        this.thumbnailPath = thumbnailPath;
+        this.csvFilePath = csvFilePath;
+
+#if UNITY_EDITOR
+        thumbnailImage.sprite = LoadSpriteFromPath(thumbnailPath);
+#endif
+
+        deleteButton.gameObject.SetActive(false);
+        addButton.gameObject.SetActive(false);
+
+        deleteButton.onClick.AddListener(OnDeleteButtonClicked);
+        addButton.onClick.AddListener(OnAddButtonClicked);
+
+        // 调用版本对比方法
+        CheckForUpdates(id, version);
+    }
+
+    private void CheckForUpdates(string id, string currentVersion)
+    {
+        if (resourceManager == null)
+        {
+            Debug.LogError("ResourceManager reference is missing.");
+            return;
+        }
+
+        var resource = resourceManager.GetResourceById(id);
+        if (resource == null)
+        {
+            Debug.LogWarning($"Resource with ID {id} not found in the total resource list.");
+            return;
+        }
+
+        // 设置总表版本号
+        totalVersionText.text = resource.Version;
+
+        if (resource.Version != currentVersion)
+        {
+            // 版本不匹配，显示更新信息            
+            versionText.color = Color.red; // 设置文本颜色为红色以强调
+            updateNotification.SetActive(true); // 显示更新提示UI实例
+        }
+        else
+        {
+            updateNotification.SetActive(false); // 隐藏更新提示UI实例
+        }
+    }
+
+#if UNITY_EDITOR
+    private Sprite LoadSpriteFromPath(string thumbnailPath)
+    {
+        // 使用新路径并直接使用传递的图片名称
+        string pathForLoading = "Assets/ZTResource/Resources/ZT_IconTextures/" + thumbnailPath + ".png"; // 确保包括文件扩展名
+        Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(pathForLoading);
+        if (texture == null)
+        {
+            Debug.LogError("Failed to load texture at path: " + pathForLoading);
+            return null;
+        }
+        return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+    }
+#endif
+
+    public void OnCardClicked()
+    {
+        itemDetailsDisplay.DisplayItemDetails(
+            idText.text,
+            nameText.text,
+            descriptionText.text,
+            heightText.text,
+            modelFacesText.text,
+            creationDateText.text,
+            updatedDateText.text,
+            versionText.text,
+            propertyTagsText.text
+        );
+
+#if UNITY_EDITOR
+        if (prefabPathText != null && !string.IsNullOrEmpty(prefabPathText.text))
+        {
+            string assetPath = prefabPathText.text;
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+            if (asset != null)
+            {
+                Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+            }
+            else
+            {
+                Debug.LogError("Cannot find asset at path: " + assetPath);
+            }
+        }
+#endif
+
+        if (targetParent == null)
+        {
+            return;
+        }
+
+        bool isAlreadyAdded = false;
+        foreach (Transform child in targetParent.transform)
+        {
+            if (child.name == prefabPathText.text)
+            {
+                isAlreadyAdded = true;
+                break;
+            }
+        }
+
+        if (isAlreadyAdded)
+        {
+            return;
+        }
+
+        foreach (Transform child in targetParent.transform)
+        {
+            Destroy(child.gameObject);
+        }
+
+#if UNITY_EDITOR
+        string resourcePath = prefabPathText.text;
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(resourcePath);
+        if (prefab != null)
+        {
+            GameObject instantiatedPrefab = Instantiate(prefab, targetParent.transform.position, Quaternion.identity, targetParent.transform);
+            instantiatedPrefab.name = nameText.text;
+        }
+#endif
+
+        if (currentSelectedCard != null)
+        {
+            currentSelectedCard.deleteButton.gameObject.SetActive(false);
+            currentSelectedCard.addButton.gameObject.SetActive(false);
+        }
+
+        currentSelectedCard = this;
+        deleteButton.gameObject.SetActive(true);
+        addButton.gameObject.SetActive(true);
+    }
+
+    private void OnDeleteButtonClicked()
+    {
+        string cardId = idText.text;
+        CSVParser.DeleteResource(csvFilePath, cardId);
+
+        CardInfo cardToRemove = SelectedCardSpawner.Instance.ExistingCards.FirstOrDefault(card => card.ID == cardId);
+        if (cardToRemove != null)
+        {
+            SelectedCardSpawner.Instance.RemoveCardInfo(cardToRemove);
+        }
+
+        Destroy(gameObject);
+        currentSelectedCard = null;
+    }
+
+    public void OnAddButtonClicked()
+    {
+        SelectedCardSpawner.Instance.SpawnSelectedCard(
+            idText.text,
+            nameText.text,
+            descriptionText.text,
+            heightText.text,
+            versionText.text,
+            prefabPathText.text,
+            thumbnailPath,
+            typeTagsText.text,
+            themeTagsText.text,
+            functionTagsText.text,
+            definitionTagsText.text,
+            batchTagsText.text,
+            propertyTagsText.text,
+            modelFacesText.text,
+            creationDateText.text,
+            updatedDateText.text
+        );
+    }
+}
+
+源代码内容解释如下：
+### 功能概览
+
+**功能定位**  
+`HistoryCardUI` 是一个用于展示资源卡片信息的 Unity 脚本组件。它主要负责显示资源的详细信息（如 ID、名称、描述、版本等），并提供用户交互功能（如删除、添加资源）。
+
+**系统角色**  
+该组件在资源管理系统中扮演重要角色，用于可视化资源卡片信息，并与其他模块（如 `ItemDetailsDisplay`、`CSVParser`、`ResourceManager`）协同工作，实现资源管理的核心功能。
+
+**主要特性与技术实现**  
+1. **资源信息展示**：通过字段绑定显示资源的详细信息（如 ID、名称、描述、版本、标签等）。
+2. **版本对比**：通过 `ResourceManager` 对比资源版本，显示更新提示。
+3. **用户交互**：提供删除和添加按钮，支持用户对资源进行操作。
+4. **依赖管理**：依赖 `ItemDetailsDisplay`、`CSVParser`、`ResourceManager` 等模块。
+5. **Unity 编辑器支持**：在 Unity 编辑器环境下，支持资源路径加载和Prefab实例化。
+
+---
+
+### 核心类解析
+
+**类名称**：`HistoryCardUI`  
+**职责说明**：  
+- 管理资源卡片的 UI 显示
+- 处理用户交互（如点击卡片、删除/添加资源）
+- 与 `ItemDetailsDisplay`、`CSVParser`、`ResourceManager` 等模块协同工作
+
+**关键方法清单**：  
+- `public void SetupCard(...)`：初始化卡片数据
+- `public void OnCardClicked()`：处理卡片点击事件
+- `public void OnDeleteButtonClicked()`：处理删除按钮点击事件
+- `public void OnAddButtonClicked()`：处理添加按钮点击事件
+- `private void CheckForUpdates(string id, string currentVersion)`：检查资源版本更新
+
+**继承关系**：  
+`HistoryCardUI` -> `MonoBehaviour`
+
+**依赖模块**：  
+- `ItemDetailsDisplay`
+- `CSVParser`
+- `ResourceManager`
+
+---
+
+### 关键方法详解
+
+#### 1. `public void SetupCard(...)`
+**方法签名**：  
+```csharp
+public void SetupCard(
+    string id,
+    string name,
+    string description,
+    string height,
+    string version,
+    string prefabPath,
+    string thumbnailPath,
+    string typeTags,
+    string themeTags,
+    string functionTags,
+    string definitionTags,
+    string batchTags,
+    string propertyTags,
+    string modelFaces,
+    string creationDate,
+    string updatedDate,
+    string csvFilePath
+)
+```
+
+**功能描述**：  
+- 初始化卡片数据，设置文本显示内容（如 ID、名称、描述等）。
+- 加载缩略图（仅在 Unity 编辑器环境下支持）。
+- 初始化删除和添加按钮的点击事件监听器。
+- 调用 `CheckForUpdates` 方法，检查资源版本更新。
+
+**调用关系**：  
+- 由外部（如 `CardSpawner`）调用，用于创建和初始化卡片。
+
+---
+
+#### 2. `public void OnCardClicked()`
+**方法签名**：  
+```csharp
+public void OnCardClicked()
+```
+
+**功能描述**：  
+- 显示资源的详细信息（通过 `ItemDetailsDisplay` 组件）。
+- 在 Unity 编辑器环境下，跳转到资源的Prefab路径。
+- 管理删除和添加按钮的显示状态（仅当前选中的卡片显示）。
+
+**调用关系**：  
+- 由 Unity UI 系统调用（当用户点击卡片时触发）。
+
+---
+
+#### 3. `public void OnDeleteButtonClicked()`
+**方法签名**：  
+```csharp
+public void OnDeleteButtonClicked()
+```
+
+**功能描述**：  
+- 从 CSV 文件中删除资源记录。
+- 从内存中移除对应的卡片信息。
+- 销毁当前卡片的 GameObject 实例。
+
+**调用关系**：  
+- 由删除按钮的点击事件触发。
+
+---
+
+#### 4. `public void OnAddButtonClicked()`
+**方法签名**：  
+```csharp
+public void OnAddButtonClicked()
+```
+
+**功能描述**：  
+- 将当前卡片信息传递给 `SelectedCardSpawner`，用于生成预制体实例。
+
+**调用关系**：  
+- 由添加按钮的点击事件触发。
+
+---
+
+#### 5. `private void CheckForUpdates(string id, string currentVersion)`
+**方法签名**：  
+```csharp
+private void CheckForUpdates(string id, string currentVersion)
+```
+
+**功能描述**：  
+- 通过 `ResourceManager` 获取资源的最新版本信息。
+- 比较当前版本和最新版本，显示更新提示（文本变红并显示 `updateNotification`）。
+
+**调用关系**：  
+- 由 `SetupCard` 方法调用，用于版本对比。
+
+---
+
+### 架构关系图
+
+```mermaid
+classDiagram
+    class HistoryCardUI {
+        +MonoBehaviour
+        +SetupCard(...)
+        +OnCardClicked()
+        +OnDeleteButtonClicked()
+        +OnAddButtonClicked()
+        +CheckForUpdates(...)
+        +ItemDetailsDisplay itemDetailsDisplay
+        +CSVParser cSVParser
+        +ResourceManager resourceManager
+    }
+    
+    HistoryCardUI --> ItemDetailsDisplay : 使用
+    HistoryCardUI --> CSVParser : 使用
+    HistoryCardUI --> ResourceManager : 使用
+```
+
+---
+
+### 总结
+
+`HistoryCardUI` 是一个功能全面的资源卡片管理组件，通过字段绑定和事件处理实现资源信息的可视化展示和用户交互。其核心功能包括资源信息展示、版本对比、删除/添加操作等，通过与其他模块的协同合作，实现了资源管理系统的完整功能。

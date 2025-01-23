@@ -1,0 +1,139 @@
+文件源代码内容如下：
+using System.Collections.Generic;
+using UnityEngine;
+
+public class MainUIController : MonoBehaviour
+{
+    public UserInfoUI userInfoUI;
+    public Transform batchParent;
+    public GameObject batchPrefab;
+
+    private string csvFilePath; // 新增存储CSV文件路径的变量
+
+    public void SetupPurchaseRecords(string userName, string userAvatar, List<(string batchName, string batchTime, List<CardInfo> cardInfos)> batches, string csvFilePath)
+    {
+        this.csvFilePath = csvFilePath; // 设置CSV文件路径
+
+        // 清空现有的批次UI
+        foreach (Transform child in batchParent)
+        {
+            Destroy(child.gameObject);
+        }
+
+        // 设置用户信息
+        userInfoUI.SetupUserInfo(userName, userAvatar);
+
+        // 创建新的批次UI
+        foreach (var batch in batches)
+        {
+            GameObject batchObject = Instantiate(batchPrefab, batchParent);
+            BatchUI batchUI = batchObject.GetComponent<BatchUI>();
+
+            batchUI.SetupBatch(batch.batchName, batch.batchTime, batch.cardInfos, csvFilePath); // 传递CSV文件路径
+
+        }
+    }
+}
+
+源代码内容解释如下：
+### 功能概览
+
+**功能定位：**  
+MainUIController是一个用于管理用户界面显示的控制类，主要负责展示用户的购买记录和相关信息。它通过接收用户数据和购买批次数据，动态生成并更新UI元素，为用户提供清晰的购买历史视图。
+
+**系统角色：**  
+在系统中，MainUIController扮演着用户界面管理的核心角色，是连接后端数据处理与前端显示的重要桥梁。它确保用户能够直观地查看自己的购买记录，并通过CSV文件路径支持数据的导出功能。
+
+**主要特性与技术实现：**  
+- **动态UI生成：** 根据传入的批次数据动态生成对应的UI元素。
+- **用户信息展示：** 通过UserInfoUI组件显示用户的基本信息。
+- **数据更新机制：** 支持清空和重新生成UI元素，以响应最新的数据变化。
+- **CSV文件路径管理：** 存储CSV文件路径以便后续处理。
+
+---
+
+### 核心类解析
+
+**类名称：MainUIController**
+
+- **职责说明：**  
+  MainUIController的主要职责是管理用户界面的显示，包括用户信息的呈现和购买记录的动态生成。它通过调用相关组件的方法，确保UI内容能够根据输入数据实时更新。
+
+- **关键方法清单：**
+  - `public void SetupPurchaseRecords(string userName, string userAvatar, List<(string batchName, string batchTime, List<CardInfo> cardInfos)> batches, string csvFilePath)`
+  
+- **继承关系：**  
+  MainUIController -> MonoBehaviour
+
+- **依赖模块：**  
+  - `UserInfoUI`
+  - `BatchUI`
+  - `Transform` (UnityEngine)
+  - `GameObject` (UnityEngine)
+  - `CardInfo` (假设为项目内自定义结构)
+
+---
+
+### 关键方法详解
+
+**方法名称：SetupPurchaseRecords**
+
+**方法签名：**  
+```csharp
+public void SetupPurchaseRecords(string userName, string userAvatar, List<(string batchName, string batchTime, List<CardInfo> cardInfos)> batches, string csvFilePath)
+```
+
+**功能描述：**  
+SetupPurchaseRecords方法负责初始化和更新用户的购买记录UI。它接收用户信息、购买批次数据和CSV文件路径作为输入参数，执行以下操作：
+1. **存储CSV文件路径：** 将CSV文件路径存储为类的私有变量，以供后续使用。
+2. **清空现有UI元素：** 遍历并销毁batchParent下所有子对象，确保旧的UI元素被移除。
+3. **设置用户信息：** 调用UserInfoUI组件的SetupUserInfo方法，显示用户名和用户头像。
+4. **生成新批次UI：** 对于每个批次数据， Instantiate一个预制体并附加BatchUI组件，然后调用BatchUI的SetupBatch方法，传入批次信息和CSV文件路径。
+
+**算法说明：**  
+该方法采用简单的线性遍历算法，逐个处理每个批次数据，生成对应的UI元素。整体复杂度为O(N)，其中N为批次的数量。
+
+**调用关系：**  
+- **被调用者：**  
+  - `Destroy(child.gameObject)`：用于销毁旧的UI元素。
+  - `Instantiate(batchPrefab, batchParent)`：用于生成新的UI预制体。
+  - `GetComponent<BatchUI>()`：获取BatchUI组件实例。
+  - `SetupUserInfo(userName, userAvatar)`：设置用户信息。
+  - `SetupBatch(batch.batchName, batch.batchTime, batch.cardInfos, csvFilePath)`：设置批次信息。
+- **调用频率：**  
+  该方法通常在需要更新购买记录UI时被调用，频率取决于数据更新的频率，可能是每次应用启动或数据变更后调用一次。
+
+---
+
+### 架构关系图
+
+```mermaid
+classDiagram
+    class MainUIController {
+        +UserInfoUI userInfoUI
+        +Transform batchParent
+        +GameObject batchPrefab
+        -string csvFilePath
+        +void SetupPurchaseRecords(string, string, List<(string, string, List<CardInfo>)>, string)
+    }
+    class MonoBehaviour {
+        // 基类，包含Unity组件的基本功能
+    }
+    class UserInfoUI {
+        +void SetupUserInfo(string, string)
+        // 其他方法和属性
+    }
+    class BatchUI {
+        +void SetupBatch(string, string, List<CardInfo>, string)
+        // 其他方法和属性
+    }
+    MainUIController --> UserInfoUI : 依赖
+    MainUIController --> BatchUI : 依赖
+    MainUIController --> MonoBehaviour : 继承
+```
+
+---
+
+### 总结
+
+MainUIController是一个负责管理用户界面显示的核心类，通过动态生成和更新UI元素，确保用户能够清晰地查看自己的购买记录。它在系统中起着重要的桥梁作用，连接了数据处理层和展示层，为用户提供直观的数据视图。其设计简洁高效，能够灵活应对数据的动态变化，为系统的扩展性和维护性提供了良好的基础。

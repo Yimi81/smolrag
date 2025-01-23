@@ -1,0 +1,281 @@
+文件源代码内容如下：
+using UnityEngine;
+using UnityEngine.EventSystems;
+using System.Collections;
+using System.Collections.Generic;
+
+public class ZTDragAndDrop : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerDownHandler, IPointerUpHandler
+{
+    private Transform originalParent;
+    private Canvas canvas;
+    private CanvasGroup canvasGroup;
+    private bool isDragging = false;
+    private float holdTime = 0.2f;  // 按住0.2秒
+    private Coroutine holdCoroutine;
+    private HistoryCardUI historyCardUI;
+    private BatchUI originalBatchUI;
+    private BatchUI targetBatchUI;
+
+    void Start()
+    {
+        // 获取Canvas组件
+        canvas = GetComponentInParent<Canvas>();
+
+        // 确保对象上有CanvasGroup组件
+        canvasGroup = GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        }
+
+        // 获取HistoryCardUI组件
+        historyCardUI = GetComponent<HistoryCardUI>();
+        // 获取原始批次的BatchUI组件
+        originalBatchUI = GetComponentInParent<BatchUI>();
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        holdCoroutine = StartCoroutine(StartHoldTimer());
+    }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        if (holdCoroutine != null)
+        {
+            StopCoroutine(holdCoroutine);
+            holdCoroutine = null;
+        }
+    }
+
+    private IEnumerator StartHoldTimer()
+    {
+        yield return new WaitForSeconds(holdTime);
+        isDragging = true;
+        originalParent = transform.parent;
+        transform.SetParent(canvas.transform, true);
+        canvasGroup.blocksRaycasts = false;
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        // 仅当isDragging为true时才开始拖动
+        if (!isDragging)
+        {
+            eventData.pointerDrag = null;
+            return;
+        }
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (!isDragging)
+            return;
+
+        Vector2 localPoint;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(canvas.transform as RectTransform, eventData.position, eventData.pressEventCamera, out localPoint);
+        transform.localPosition = localPoint;
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        if (!isDragging)
+            return;
+
+        isDragging = false;
+        canvasGroup.blocksRaycasts = true;
+
+        GameObject dropZone = GetDropZoneUnderPointer(eventData);
+
+        if (dropZone != null && dropZone.CompareTag("DropZone"))
+        {
+            targetBatchUI = dropZone.GetComponentInParent<BatchUI>();
+            if (targetBatchUI != null && historyCardUI != null)
+            {
+                string resourceId = historyCardUI.idText.text;
+                string targetBatchTime = targetBatchUI.batchTimeText.text;
+
+                string csvFilePath = historyCardUI.csvFilePath;
+
+                // 直接移动资源到目标批次
+                CSVParser.MoveResourceToBatch(csvFilePath, resourceId, targetBatchTime);
+
+                // 将资源卡UI移动到新的批次中
+                transform.SetParent(dropZone.transform, false);
+            }
+        }
+        else
+        {
+            transform.SetParent(originalParent, false);
+        }
+    }
+
+    private GameObject GetDropZoneUnderPointer(PointerEventData eventData)
+    {
+        List<RaycastResult> raycastResults = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(eventData, raycastResults);
+
+        foreach (RaycastResult result in raycastResults)
+        {
+            if (result.gameObject.CompareTag("DropZone"))
+            {
+                return result.gameObject;
+            }
+        }
+
+        return null;
+    }
+}
+
+源代码内容解释如下：
+```markdown
+# ZTDragAndDrop 代码分析
+
+## 1. 功能概览
+
+### 功能定位
+ZTDragAndDrop 类实现了拖放功能，允许用户通过鼠标或触控设备拖动 UI 元素，并将其放置在目标区域。该类主要负责处理拖放事件、状态管理以及与 CSV 数据的交互。
+
+### 在系统中的角色和重要性
+该类是用户交互的核心组件，直接影响用户体验，确保用户能够通过拖放操作调整资源批次。其正确实现对于系统的功能完整性和可用性至关重要。
+
+### 主要特性和技术实现方案
+- **拖放事件处理**：实现 IBeginDragHandler、IDragHandler、IEndDragHandler 等接口，处理拖放过程中的各个阶段。
+- **延迟启动**：通过协程实现拖放操作的延迟启动，防止误触。
+- **状态管理**：维护拖放状态，包括原始父对象、当前画布和拖放标志。
+- **CSV 数据交互**：通过 CSVParser 移动资源到目标批次。
+- **视觉反馈**：调整 CanvasGroup 的 blocksRaycasts 属性，控制拖放过程中元素的交互状态。
+
+## 2. 核心类解析
+
+### ZTDragAndDrop
+
+#### 职责说明
+该类负责处理拖放事件，管理拖放状态，并与 CSV 数据进行交互，实现资源的重新分配。
+
+#### 关键方法清单
+- `public void OnPointerDown(PointerEventData eventData)`
+- `public void OnPointerUp(PointerEventData eventData)`
+- `private IEnumerator StartHoldTimer()`
+- `public void OnBeginDrag(PointerEventData eventData)`
+- `public void OnDrag(PointerEventData eventData)`
+- `public void OnEndDrag(PointerEventData eventData)`
+- `private GameObject GetDropZoneUnderPointer(PointerEventData eventData)`
+
+#### 继承关系
+```mermaid
+graph TD
+    ZTDragAndDrop --> MonoBehaviour
+```
+
+#### 依赖模块
+- `UnityEngine.UI`（Canvas、CanvasGroup）
+- `UnityEngine.EventSystems`（PointerEventData、EventSystem）
+- `System.Collections`（IEnumerator、 WaitForSeconds）
+- `System.Collections.Generic`（List）
+- 项目内类：HistoryCardUI、BatchUI、CSVParser
+
+## 3. 关键方法详解
+
+### `public void OnPointerDown(PointerEventData eventData)`
+#### 方法签名
+```csharp
+public void OnPointerDown(PointerEventData eventData)
+```
+#### 功能描述
+当用户按下鼠标按钮或触控设备时调用，启动一个协程来计时拖放操作的延迟启动。
+
+#### 调用关系
+- 被 Unity 事件系统调用，频率取决于用户的输入操作。
+
+### `public void OnPointerUp(PointerEventData eventData)`
+#### 方法签名
+```csharp
+public void OnPointerUp(PointerEventData eventData)
+```
+#### 功能描述
+当用户释放鼠标按钮或触控设备时调用，停止拖放计时器。
+
+#### 调用关系
+- 被 Unity 事件系统调用，频率取决于用户的输入操作。
+
+### `private IEnumerator StartHoldTimer()`
+#### 方法签名
+```csharp
+private IEnumerator StartHoldTimer()
+```
+#### 功能描述
+启动一个协程，等待 `holdTime` 时间后，将 `isDragging` 标志设为 true，并调整拖放对象的父对象和画布组属性。
+
+#### 算法说明
+使用 `WaitForSeconds` 协程实现延迟计时。
+
+#### 调用关系
+- 被 `OnPointerDown` 方法调用，频率取决于用户的输入操作。
+
+### `public void OnBeginDrag(PointerEventData eventData)`
+#### 方法签名
+```csharp
+public void OnBeginDrag(PointerEventData eventData)
+```
+#### 功能描述
+检查拖放状态，如果 `isDragging` 为 true，则允许拖动操作。
+
+#### 调用关系
+- 被 Unity 事件系统调用，频率取决于用户的拖放操作。
+
+### `public void OnDrag(PointerEventData eventData)`
+#### 方法签名
+```csharp
+public void OnDrag(PointerEventData eventData)
+```
+#### 功能描述
+根据鼠标或触控设备的位置，更新拖放对象的局部位置。
+
+#### 算法说明
+使用 `RectTransformUtility.ScreenPointToLocalPointInRectangle` 方法将屏幕坐标转换为局部坐标。
+
+#### 调用关系
+- 被 Unity 事件系统调用，频率取决于用户的拖动操作。
+
+### `public void OnEndDrag(PointerEventData eventData)`
+#### 方法签名
+```csharp
+public void OnEndDrag(PointerEventData eventData)
+```
+#### 功能描述
+结束拖放操作，检查鼠标或触控设备是否位于目标区域（DropZone），如果是，则将资源移动到目标批次，否则将其放回原位置。
+
+#### 调用关系
+- 被 Unity 事件系统调用，频率取决于用户的拖放操作。
+
+### `private GameObject GetDropZoneUnderPointer(PointerEventData eventData)`
+#### 方法签名
+```csharp
+private GameObject GetDropZoneUnderPointer(PointerEventData eventData)
+```
+#### 功能描述
+通过射线检测，判断鼠标或触控设备是否位于目标区域（DropZone）上，返回对应的物体。
+
+#### 算法说明
+使用 `EventSystem.current.RaycastAll` 方法获取所有命中结果，遍历检查是否为 DropZone。
+
+#### 调用关系
+- 被 `OnEndDrag` 方法调用，频率取决于用户的拖放操作。
+
+## 4. 架构关系图
+
+```mermaid
+graph TD
+    ZTDragAndDrop --> Canvas
+    ZTDragAndDrop --> CanvasGroup
+    ZTDragAndDrop --> HistoryCardUI
+    ZTDragAndDrop --> BatchUI
+    ZTDragAndDrop --> CSVParser
+```
+
+### 说明
+- **继承层次结构**：ZTDragAndDrop 继承自 MonoBehaviour。
+- **组合/聚合关系**：ZTDragAndDrop 组合 Canvas、CanvasGroup、HistoryCardUI、BatchUI 组件。
+- **重要依赖关系**：依赖 CSVParser 类进行数据操作。
+- **接口实现情况**：实现 IBeginDragHandler、IDragHandler、IEndDragHandler、IPointerDownHandler、IPointerUpHandler 接口。

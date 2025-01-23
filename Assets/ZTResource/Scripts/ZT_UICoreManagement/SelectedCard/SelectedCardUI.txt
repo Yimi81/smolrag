@@ -1,0 +1,369 @@
+文件源代码内容如下：
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.Linq;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+public class SelectedCardUI : MonoBehaviour
+{
+    public TextMeshProUGUI idText;
+    public TextMeshProUGUI nameText;
+    public TextMeshProUGUI descriptionText;
+    public TextMeshProUGUI heightText;
+    public TextMeshProUGUI versionText;
+    public TextMeshProUGUI prefabPathText;
+    public Image thumbnailImage;
+    public TextMeshProUGUI typeTagsText;
+    public TextMeshProUGUI themeTagsText;
+    public TextMeshProUGUI functionTagsText;
+    public TextMeshProUGUI definitionTagsText;
+    public TextMeshProUGUI batchTagsText;
+    public TextMeshProUGUI propertyTagsText;
+    public TextMeshProUGUI modelFacesText;
+    public TextMeshProUGUI creationDateText;
+    public TextMeshProUGUI updatedDateText;
+    public Button deleteButton;
+
+    public GameObject targetParent;
+
+    public GameObject distinctionUIInstance;
+    public GameObject pathErrorUIInstance;
+
+    public ItemDetailsDisplay itemDetailsDisplay;
+
+    private static SelectedCardUI currentSelectedCard;
+
+    void Start()
+    {
+        if (distinctionUIInstance != null)
+        {
+            distinctionUIInstance.SetActive(false);
+        }
+        if (pathErrorUIInstance != null)
+        {
+            pathErrorUIInstance.SetActive(false);
+        }
+    }
+
+    public void SetupCard(
+        string id,
+        string name,
+        string description,
+        string height,
+        string version,
+        string prefabPath,
+        string thumbnailPath,
+        string typeTags,
+        string themeTags,
+        string functionTags,
+        string definitionTags,
+        string batchTags,
+        string propertyTags,
+        string modelFaces,
+        string creationDate,
+        string updatedDate
+    )
+    {
+        idText.text = id;
+        nameText.text = name;
+        descriptionText.text = description;
+        heightText.text = $"{height:F2}";
+        versionText.text = version;
+        prefabPathText.text = prefabPath;
+        typeTagsText.text = typeTags;
+        themeTagsText.text = themeTags;
+        functionTagsText.text = functionTags;
+        definitionTagsText.text = definitionTags;
+        batchTagsText.text = batchTags;
+        propertyTagsText.text = propertyTags;
+        modelFacesText.text = modelFaces;
+        creationDateText.text = creationDate;
+        updatedDateText.text = updatedDate;
+
+        // 在运行时和编辑器中使用不同的方式加载图片
+        thumbnailImage.sprite = LoadSpriteFromPath(thumbnailPath);
+
+        deleteButton.gameObject.SetActive(false);
+        deleteButton.onClick.AddListener(OnDeleteButtonClicked);
+
+        if (pathErrorUIInstance != null)
+        {
+            pathErrorUIInstance.SetActive(false);
+        }
+    }
+
+    private Sprite LoadSpriteFromPath(string thumbnailPath)
+    {
+#if UNITY_EDITOR
+        string pathForLoading = "Assets/ZTResource/Resources/ZT_IconTextures/" + thumbnailPath + ".png";
+        Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(pathForLoading);
+        if (texture == null)
+        {
+            Debug.LogError("Failed to load texture at path: " + pathForLoading);
+            return null;
+        }
+        return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+#else
+        string resourcePath = "ZT_IconTextures/" + thumbnailPath;
+        Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+        if (texture == null)
+        {
+            Debug.LogError("Failed to load texture from Resources: " + resourcePath);
+            return null;
+        }
+        return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+#endif
+    }
+
+    public void OnCardClicked()
+    {
+        itemDetailsDisplay.DisplayItemDetails(
+            idText.text,
+            nameText.text,
+            descriptionText.text,
+            heightText.text,
+            modelFacesText.text,
+            creationDateText.text,
+            updatedDateText.text,
+            versionText.text,
+            propertyTagsText.text
+        );
+
+#if UNITY_EDITOR
+        if (!string.IsNullOrEmpty(prefabPathText.text))
+        {
+            string assetPath = prefabPathText.text;
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+            if (asset != null)
+            {
+                Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+            }
+            else
+            {
+                Debug.LogError("Cannot find asset at path: " + assetPath);
+                ShowPathErrorUI();
+            }
+        }
+#endif
+
+        if (targetParent == null)
+        {
+            return;
+        }
+
+        bool isAlreadyAdded = targetParent.transform.Cast<Transform>().Any(child => child.name == prefabPathText.text);
+
+        if (isAlreadyAdded)
+        {
+            return;
+        }
+
+        foreach (Transform child in targetParent.transform)
+        {
+            Destroy(child.gameObject);
+        }
+
+#if UNITY_EDITOR
+        string resourcePath = prefabPathText.text;
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(resourcePath);
+        if (prefab != null)
+        {
+            GameObject instantiatedPrefab = Instantiate(prefab, targetParent.transform.position, Quaternion.identity, targetParent.transform);
+            instantiatedPrefab.name = nameText.text;
+        }
+#endif
+
+        if (currentSelectedCard != null)
+        {
+            currentSelectedCard.deleteButton.gameObject.SetActive(false);
+        }
+
+        currentSelectedCard = this;
+        deleteButton.gameObject.SetActive(true);
+    }
+
+    private void OnDeleteButtonClicked()
+    {
+        CardInfo cardToRemove = SelectedCardSpawner.Instance.ExistingCards.FirstOrDefault(card => card.Name == nameText.text);
+
+        if (cardToRemove != null)
+        {
+            SelectedCardSpawner.Instance.RemoveCardInfo(cardToRemove);
+        }
+
+        Destroy(gameObject);
+        currentSelectedCard = null;
+    }
+
+    public void SetDistinctionUIVisibility(bool isVisible)
+    {
+        if (distinctionUIInstance != null)
+        {
+            distinctionUIInstance.SetActive(isVisible);
+        }
+    }
+
+    public void SetPathErrorUIVisibility(bool isVisible)
+    {
+        if (pathErrorUIInstance != null)
+        {
+            pathErrorUIInstance.SetActive(isVisible);
+        }
+    }
+
+    public void ShowPathErrorUI()
+    {
+        if (pathErrorUIInstance != null)
+        {
+            pathErrorUIInstance.SetActive(true);
+        }
+    }
+
+    public void HidePathErrorUI()
+    {
+        if (pathErrorUIInstance != null)
+        {
+            pathErrorUIInstance.SetActive(false);
+        }
+    }
+}
+
+源代码内容解释如下：
+```markdown
+# 分析报告：SelectedCardUI 类
+
+## 1. 功能概览
+
+### 功能定位
+`SelectedCardUI` 类是一个 MonoBehaviour，主要负责在 Unity 场景中显示和管理选中的卡片信息。它通过 UI 组件展示卡片的详细属性，包括 ID、名称、描述、版本、缩略图等。
+
+### 系统角色
+该类在卡片选择和显示系统中扮演核心角色，是用户与卡片数据交互的主要界面。它不仅展示数据，还处理用户点击行为和删除操作，确保数据的准确性和一致性。
+
+### 主要特性
+- **卡片信息显示**：通过 TextMeshPro 和 Unity UI 组件展示多维度卡片数据。
+- **缩略图加载**：支持在 Unity 编辑器和运行时环境中从不同路径加载图片。
+- **用户交互**：响应点击事件，展示详细信息，管理删除操作。
+- **错误处理**：显示路径错误提示，确保用户获得反馈。
+
+### 技术实现
+- 使用 TextMeshProUGUI 和 Image 组件进行 UI 展示。
+- 通过 `LoadSpriteFromPath` 方法在不同环境中加载资源。
+- 单例模式管理当前选中的卡片实例。
+
+## 2. 核心类解析
+
+### 类名称
+`SelectedCardUI`
+
+#### 职责说明
+管理选中的卡片信息显示，处理用户交互，包括点击和删除操作，同时管理错误提示UI的显示。
+
+#### 关键方法清单
+```csharp
+public void SetupCard(string id, string name, string description, ...)
+public void OnCardClicked()
+public void OnDeleteButtonClicked()
+private Sprite LoadSpriteFromPath(string thumbnailPath)
+public void SetDistinctionUIVisibility(bool isVisible)
+public void SetPathErrorUIVisibility(bool isVisible)
+public void ShowPathErrorUI()
+public void HidePathErrorUI()
+```
+
+#### 继承关系
+```mermaid
+graph TD;
+    SelectedCardUI --> MonoBehaviour
+```
+
+#### 依赖模块
+- `UnityEngine`
+- `UnityEngine.UI`
+- `TextMeshPro`
+- `System.Linq`
+- `ItemDetailsDisplay`
+- `SelectedCardSpawner`
+
+## 3. 关键方法详解
+
+### 3.1 SetupCard
+#### 方法签名
+```csharp
+public void SetupCard(string id, string name, string description, ...)
+```
+
+#### 功能描述
+设置卡片的显示内容，接收大量参数并将它们分配到对应的 UI 组件中。同时加载缩略图。
+
+#### 算法说明
+直接赋值参数到 UI 组件，并调用 `LoadSpriteFromPath` 加载缩略图。
+
+#### 调用关系
+- 被 `SelectedCardSpawner` 或其他卡片管理类调用，频率较高。
+
+### 3.2 OnCardClicked
+#### 方法签名
+```csharp
+public void OnCardClicked()
+```
+
+#### 功能描述
+处理卡片点击事件，显示详细信息。在 Unity 编辑器中加载预制体，在运行时实例化预制体，并管理删除按钮的显示。
+
+#### 算法说明
+调用 `ItemDetailsDisplay.DisplayItemDetails` 显示详细信息，检查并加载预制体，管理删除按钮可见性。
+
+#### 调用关系
+- 由 Unity UI 系统调用，频率取决于用户点击操作。
+
+### 3.3 OnDeleteButtonClicked
+#### 方法签名
+```csharp
+public void OnDeleteButtonClicked()
+```
+
+#### 功能描述
+处理删除按钮点击事件，从管理器中移除卡片信息，并销毁当前 GameObject。
+
+#### 算法说明
+查找并移除卡片信息，销毁自身实例。
+
+#### 调用关系
+- 由删除按钮的点击事件触发，频率较低。
+
+### 3.4 LoadSpriteFromPath
+#### 方法签名
+```csharp
+private Sprite LoadSpriteFromPath(string thumbnailPath)
+```
+
+#### 功能描述
+根据路径加载图片，返回 Sprite 对象。
+
+#### 算法说明
+根据 Unity 环境不同，使用 `AssetDatabase` 或 `Resources.Load` 加载资源，处理加载失败的情况。
+
+#### 调用关系
+- 被 `SetupCard` 调用，频率较高。
+
+## 4. 架构关系图
+
+```mermaid
+graph TD;
+    SelectedCardUI --> MonoBehaviour;
+    SelectedCardUI --> ItemDetailsDisplay;
+    SelectedCardUI --> SelectedCardSpawner;
+    SelectedCardUI --> TextMeshProUGUI;
+    SelectedCardUI --> Image;
+    SelectedCardUI --> Button;
+```
+
+## 总结
+
+`SelectedCardUI` 类是一个综合性的 UI 管理器，负责卡片信息的显示和用户交互。它通过直接的字段赋值和复杂的资源加载逻辑，确保卡片信息的准确展示，并通过事件处理机制响应用户操作，是项目中不可或缺的一部分。

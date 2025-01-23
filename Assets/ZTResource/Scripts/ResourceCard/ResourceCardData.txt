@@ -1,0 +1,126 @@
+文件源代码内容如下：
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+//作用：定义了一个资源卡片的数据结构，用于在UI中展示资源信息，如名称、描述、高度和标签等。
+public class ResourceCardData
+{
+    public string ID; // 新增ID字段
+    public string Name;
+    public string Description;
+    public string Height;
+    public List<string> TypeTags;
+    public List<string> ThemeTags;
+    public List<string> FunctionTags;
+    public List<string> DefinitionTags;
+    public List<string> BatchTags;
+    public List<string> PropertyTags; // 新增属性标签字段
+    public string PrefabPath;
+    public string ThumbnailPath;
+    public string ModelFaces;
+    public string CreationDate;
+    public string UpdatedDate;
+    public string Version; // 新增版本号字段
+
+    public ResourceCardData(string id, string name, string description, string height, List<string> typeTags, List<string> themeTags, List<string> functionTags, List<string> definitionTags, List<string> batchTags, List<string> propertyTags, string prefabPath, string thumbnailPath, string modelFaces, string creationDate, string updatedDate, string version)
+    {
+        ID = id;
+        Name = name;
+        Description = description;
+        Height = height;
+        TypeTags = typeTags;
+        ThemeTags = themeTags;
+        FunctionTags = functionTags;
+        DefinitionTags = definitionTags;
+        BatchTags = batchTags;
+        PropertyTags = propertyTags;
+        PrefabPath = prefabPath;
+        ThumbnailPath = thumbnailPath;
+        ModelFaces = modelFaces;
+        CreationDate = creationDate;
+        UpdatedDate = updatedDate;
+        Version = version;
+    }
+}
+源代码内容解释如下：
+### 1. 功能概览
+
+#### 代码功能定位
+ResourceCardData类是一个数据容器，用于封装资源卡片的相关信息，如名称、描述、高度、各种标签以及资源路径等。它在系统中充当数据载体的角色，便于在UI或其他模块中展示和处理资源信息。
+
+#### 系统中的角色与重要性
+该类在资源管理系统中扮演关键角色，作为资源信息的统一数据结构，确保不同模块能够一致地访问和操作资源数据。其重要性体现在提供标准化的数据格式，促进模块间的数据共享和处理。
+
+#### 支持的主要特性与技术实现
+- **数据封装**：将资源信息集中存储，便于管理。
+- **多标签分类**：支持多种类型、主题、功能等标签，便于分类和筛选。
+- **版本控制**：记录资源的创建日期、更新日期和版本号，便于追踪和管理。
+
+### 2. 核心类解析
+
+#### ResourceCardData类
+
+- **职责说明**：该类用于封装资源卡片的详细信息，包括基础属性、各种标签和资源路径等，便于在系统中进行数据传递和处理。
+  
+- **关键方法清单**：
+  - `public ResourceCardData(string id, string name, string description, string height, List<string> typeTags, List<string> themeTags, List<string> functionTags, List<string> definitionTags, List<string> batchTags, List<string> propertyTags, string prefabPath, string thumbnailPath, string modelFaces, string creationDate, string updatedDate, string version)`：构造函数，用于初始化资源卡片的数据字段。
+
+- **继承关系**：
+  ```mermaid
+  classDiagram
+    class ResourceCardData
+    ResourceCardData --> Object
+  ```
+
+- **依赖模块**：
+  - `System.Collections.Generic`：用于处理列表数据。
+  - `UnityEngine`：用于Unity引擎中的功能。
+
+### 3. 关键方法详解
+
+#### 方法签名
+```csharp
+public ResourceCardData(string id, string name, string description, string height, List<string> typeTags, List<string> themeTags, List<string> functionTags, List<string> definitionTags, List<string> batchTags, List<string> propertyTags, string prefabPath, string thumbnailPath, string modelFaces, string creationDate, string updatedDate, string version)
+```
+
+#### 功能描述
+构造函数用于初始化ResourceCardData类的实例，接收多个参数并将它们赋值给对应的字段。这些字段包括资源的唯一标识符、名称、描述、高度、各种标签列表，以及资源的Prefab路径、缩略图路径、模型面数、创建日期、更新日期和版本号。
+
+#### 算法说明
+构造函数采用简单的赋值操作，将传入的参数直接赋给类的字段，没有复杂的算法逻辑。
+
+#### 调用关系
+该构造函数通常在创建新的ResourceCardData实例时被调用，常见于数据解析、资源加载或初始化阶段。调用频率取决于系统中资源卡片的创建频率。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class ResourceCardData {
+        +string ID
+        +string Name
+        +string Description
+        +string Height
+        +List<string> TypeTags
+        +List<string> ThemeTags
+        +List<string> FunctionTags
+        +List<string> DefinitionTags
+        +List<string> BatchTags
+        +List<string> PropertyTags
+        +string PrefabPath
+        +string ThumbnailPath
+        +string ModelFaces
+        +string CreationDate
+        +string UpdatedDate
+        +string Version
+        +ResourceCardData(string id, string name, string description, string height, List<string> typeTags, List<string> themeTags, List<string> functionTags, List<string> definitionTags, List<string> batchTags, List<string> propertyTags, string prefabPath, string thumbnailPath, string modelFaces, string creationDate, string updatedDate, string version)
+    }
+    ResourceCardData --> Object
+```
+
+#### 说明
+- **继承层次结构**：ResourceCardData直接继承自System.Object。
+- **组合/聚合关系**：该类包含多个字符串和列表字段，用于存储各种资源信息。
+- **重要依赖关系**：依赖于System.Collections.Generic和UnityEngine命名空间，用于处理列表和Unity相关功能。
+- **接口实现情况**：该类未实现任何接口。

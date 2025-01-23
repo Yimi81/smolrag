@@ -1,0 +1,158 @@
+文件源代码内容如下：
+using UnityEngine;
+using TMPro;
+
+public class SearchHistoryDropdownHandler : MonoBehaviour
+{
+    public TMP_Dropdown searchHistoryDropdown;
+    public ResourceFilterResult resourceFilterResult;
+
+    private void Start()
+    {
+        if (searchHistoryDropdown != null)
+        {
+            searchHistoryDropdown.onValueChanged.AddListener(OnSearchHistorySelected);
+        }
+
+        UpdateDropdownOptions();
+    }
+
+    public void UpdateDropdownOptions()
+    {
+        if (searchHistoryDropdown != null && resourceFilterResult != null)
+        {
+            searchHistoryDropdown.onValueChanged.RemoveListener(OnSearchHistorySelected);
+
+            var searchHistory = resourceFilterResult.GetSearchHistory();
+
+            searchHistoryDropdown.ClearOptions();
+            searchHistoryDropdown.options.Add(new TMP_Dropdown.OptionData(""));
+
+            searchHistoryDropdown.AddOptions(searchHistory);
+            searchHistoryDropdown.value = 0;
+
+            searchHistoryDropdown.onValueChanged.AddListener(OnSearchHistorySelected);
+        }
+    }
+
+    public void OnSearchHistorySelected(int index)
+    {
+        if (index > 0 && resourceFilterResult != null)
+        {
+            var searchHistory = resourceFilterResult.GetSearchHistory();
+            if (index - 1 < searchHistory.Count)
+            {
+                string selectedTerm = searchHistory[index - 1];
+
+                // 将选中的记录填写到Search Input Field和Dropdown的Caption Text中
+                resourceFilterResult.searchInputField.text = selectedTerm;
+                searchHistoryDropdown.captionText.text = selectedTerm;
+            }
+        }
+    }
+}
+
+源代码内容解释如下：
+### 1. 功能概览
+
+**功能定位：**
+SearchHistoryDropdownHandler 是一个 MonoBehaviour 类，用于管理搜索历史记录的下拉菜单。它负责更新下拉菜单的选项，并在用户选择历史记录时更新搜索输入框。
+
+**在系统中的角色：**
+该类在 UI 交互中扮演重要角色，允许用户快速访问之前的搜索记录，提升用户体验。
+
+**主要特性与技术实现：**
+- 使用 TextMeshPro 的 TMP_Dropdown 组件处理下拉菜单。
+- 通过事件监听器响应用户选择。
+- 依赖 ResourceFilterResult 类获取和更新搜索历史记录。
+
+### 2. 核心类解析
+
+**类名称：SearchHistoryDropdownHandler**
+
+- **职责说明：**
+  管理搜索历史记录的下拉菜单，更新选项并响应用户选择。
+
+- **关键方法清单：**
+  - `void Start()`
+  - `public void UpdateDropdownOptions()`
+  - `public void OnSearchHistorySelected(int index)`
+
+- **继承关系：**
+  SearchHistoryDropdownHandler -> MonoBehaviour
+
+- **依赖模块：**
+  - TMP_Dropdown (TextMeshPro)
+  - ResourceFilterResult
+
+### 3. 关键方法详解
+
+**方法一：void Start()**
+
+- **方法签名：**
+  ```csharp
+  private void Start()
+  ```
+
+- **功能描述：**
+  初始化时设置事件监听器，并调用 UpdateDropdownOptions 更新下拉菜单选项。
+
+- **调用关系：**
+  在 MonoBehaviour 的生命周期中自动调用，频率为一次。
+
+**方法二：public void UpdateDropdownOptions()**
+
+- **方法签名：**
+  ```csharp
+  public void UpdateDropdownOptions()
+  ```
+
+- **功能描述：**
+  更新下拉菜单的选项，包括移除旧选项、获取新搜索历史、添加新选项并重新设置事件监听器。
+
+- **算法说明：**
+  1. 移除现有的事件监听器。
+  2. 获取最新的搜索历史记录。
+  3. 清空当前选项，添加空选项。
+  4. 添加搜索历史到下拉菜单，设置默认选中。
+  5. 重新添加事件监听器。
+
+- **调用关系：**
+  在 Start 方法中调用，以及可能在其他地方（如搜索历史更新时）。
+
+**方法三：public void OnSearchHistorySelected(int index)**
+
+- **方法签名：**
+  ```csharp
+  public void OnSearchHistorySelected(int index)
+  ```
+
+- **功能描述：**
+  处理用户选择的搜索历史记录，更新输入框和下拉菜单的显示文本。
+
+- **算法说明：**
+  1. 检查索引是否有效。
+  2. 获取选中的搜索词。
+  3. 更新输入框和下拉菜单的文本。
+
+- **调用关系：**
+  由 TMP_Dropdown 的 onValueChanged 事件触发，频率取决于用户选择次数。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class SearchHistoryDropdownHandler {
+        +TMP_Dropdown searchHistoryDropdown
+        +ResourceFilterResult resourceFilterResult
+        +void Start()
+        +public void UpdateDropdownOptions()
+        +public void OnSearchHistorySelected(int index)
+    }
+    SearchHistoryDropdownHandler --> TMP_Dropdown
+    SearchHistoryDropdownHandler --> ResourceFilterResult
+```
+
+**图示说明：**
+- SearchHistoryDropdownHandler 依赖于 TMP_Dropdown 和 ResourceFilterResult。
+- 没有继承关系，也没有组合或聚合关系，主要通过依赖关系与其它模块交互。

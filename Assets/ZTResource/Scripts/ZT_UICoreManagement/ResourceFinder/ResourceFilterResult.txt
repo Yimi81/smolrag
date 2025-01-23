@@ -1,0 +1,354 @@
+文件源代码内容如下：
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+public class ResourceFilterResult : MonoBehaviour
+{
+    public string[] typeTag = new string[0];
+    public string[] themeTag = new string[0];
+    public string[] functionTag = new string[0];
+    public string[] batchTag = new string[0];
+    public string[] definitionTag = new string[0];
+    public string[] propertyTag = new string[0];
+
+    public string SearchTerm = "";
+    private ResourceFilter resourceFilter;
+    public ResourceCardSpawner resourceCardSpawner;
+    public MultipleTagButtonCreator multipleTagButtonCreator;
+
+    public TMP_InputField searchInputField;
+    public Button searchButton;
+    public Button clearButton;
+
+    public RectTransform panel;
+    public Button toggleWidthButton;
+    public float defaultWidth = 1621f;
+    public float fullScreenWidth = 2806f;
+    private bool isFullScreen = false;
+
+    public AiSearch aiSearch;
+
+    private List<string> idList = new List<string>();
+    private List<string> searchHistory = new List<string>();
+
+    private void Start()
+    {
+        resourceFilter = FindObjectOfType<ResourceFilter>();
+        FilterAndPrintResources();
+        searchButton.onClick.AddListener(PerformSearch);
+
+        clearButton.onClick.AddListener(ClearAllFilters);
+        clearButton.gameObject.SetActive(false);
+
+        if (panel != null)
+        {
+            panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, defaultWidth);
+        }
+
+        if (aiSearch != null)
+        {
+            aiSearch.OnQueryResultReceived += UpdateIdList;
+        }
+    }
+
+    private void UpdateIdList(List<string> ids)
+    {
+        idList = ids;
+        SearchTerm = ""; // ÔÚ¸üÐÂ idList Ê±Çå¿Õ SearchTerm
+        FilterAndPrintResources();
+    }
+
+
+    private void PerformSearch()
+    {
+        if (searchInputField != null)
+        {
+            SearchTerm = searchInputField.text;
+
+            AddSearchHistory(SearchTerm);
+
+            idList.Clear(); // ÔÚÐÂËÑË÷Ç°Çå¿Õ idList
+
+            FilterAndPrintResources();
+        }
+    }
+
+    public List<string> GetSearchHistory()
+    {
+        return searchHistory;
+    }
+
+    public void AddSearchHistory(string searchTerm)
+    {
+        if (!string.IsNullOrEmpty(searchTerm) && !searchHistory.Contains(searchTerm))
+        {
+            searchHistory.Add(searchTerm);
+
+            SearchHistoryDropdownHandler dropdownHandler = FindObjectOfType<SearchHistoryDropdownHandler>();
+            if (dropdownHandler != null)
+            {
+                dropdownHandler.UpdateDropdownOptions();
+            }
+        }
+    }
+
+    public void FilterAndPrintResources()
+    {
+        if (resourceFilter != null)
+        {
+            var filteredResources = resourceFilter.FilterResources(typeTag, themeTag, functionTag, batchTag, definitionTag, propertyTag, SearchTerm, idList);
+
+            List<ResourceCardData> sortedResources;
+            if (idList.Count > 0)
+            {
+                sortedResources = new List<ResourceCardData>();
+                foreach (var id in idList)
+                {
+                    var resource = filteredResources.Find(r => r.ID == id);
+                    if (resource != null)
+                    {
+                        sortedResources.Add(resource);
+                    }
+                }
+            }
+            else
+            {
+                sortedResources = filteredResources;
+            }
+
+            resourceFilter.PrintFilteredResources(sortedResources);
+
+            if (resourceCardSpawner != null)
+            {
+                resourceCardSpawner.SetFilteredResources(sortedResources);
+            }
+
+            UpdateTagButtonVisibility(sortedResources);
+        }
+
+        UpdateClearButtonVisibility();
+    }
+
+    private void UpdateTagButtonVisibility(List<ResourceCardData> filteredResources)
+    {
+        if (multipleTagButtonCreator != null)
+        {
+            HashSet<string> visibleTags = ExtractTagsFromResources(filteredResources);
+
+            multipleTagButtonCreator.UpdateTagButtonVisibility(visibleTags);
+        }
+    }
+
+    private HashSet<string> ExtractTagsFromResources(List<ResourceCardData> resources)
+    {
+        HashSet<string> tags = new HashSet<string>();
+        foreach (var resource in resources)
+        {
+            foreach (var tag in resource.TypeTags) tags.Add(tag);
+            foreach (var tag in resource.ThemeTags) tags.Add(tag);
+            foreach (var tag in resource.FunctionTags) tags.Add(tag);
+            foreach (var tag in resource.DefinitionTags) tags.Add(tag);
+            foreach (var tag in resource.BatchTags) tags.Add(tag);
+            foreach (var tag in resource.PropertyTags) tags.Add(tag);
+        }
+        return tags;
+    }
+
+    void ToggleWidth()
+    {
+        if (isFullScreen)
+        {
+            panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, defaultWidth);
+        }
+        else
+        {
+            panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, fullScreenWidth);
+        }
+        isFullScreen = !isFullScreen;
+    }
+
+    public void ClearAllFilters()
+    {
+        typeTag = new string[0];
+        themeTag = new string[0];
+        functionTag = new string[0];
+        batchTag = new string[0];
+        definitionTag = new string[0];
+        propertyTag = new string[0];
+        SearchTerm = "";
+        idList.Clear();
+
+        if (searchInputField != null)
+        {
+            searchInputField.text = "";
+        }
+
+        SearchHistoryDropdownHandler dropdownHandler = FindObjectOfType<SearchHistoryDropdownHandler>();
+        if (dropdownHandler != null && dropdownHandler.searchHistoryDropdown != null)
+        {
+            dropdownHandler.searchHistoryDropdown.onValueChanged.RemoveListener(dropdownHandler.OnSearchHistorySelected);
+            dropdownHandler.searchHistoryDropdown.value = 0;
+            dropdownHandler.searchHistoryDropdown.onValueChanged.AddListener(dropdownHandler.OnSearchHistorySelected);
+        }
+
+        ResetTagButtonStates();
+
+        FilterAndPrintResources();
+    }
+
+    private void ResetTagButtonStates()
+    {
+        if (multipleTagButtonCreator != null)
+        {
+            multipleTagButtonCreator.ResetAllTagButtonStates();
+        }
+    }
+
+    private void UpdateClearButtonVisibility()
+    {
+        bool hasFilters = typeTag.Length > 0 || themeTag.Length > 0 || functionTag.Length > 0 || batchTag.Length > 0 || definitionTag.Length > 0 || propertyTag.Length > 0 || !string.IsNullOrEmpty(SearchTerm) || idList.Count > 0;
+        clearButton.gameObject.SetActive(hasFilters);
+    }
+}
+源代码内容解释如下：
+### 1. 功能概览
+
+- **功能总结**：ResourceFilterResult 类主要用于管理资源过滤器的结果展示和用户交互逻辑。它负责处理资源的过滤、搜索、显示以及相关的 UI 控制，如标签按钮的可见性和面板宽度的切换。
+
+- **系统角色**：在Unity项目中，该类作为资源管理模块的核心部分，承担着用户输入处理、资源过滤、结果展示以及 UI 状态管理的重要职责。它是连接用户操作与资源展示的桥梁。
+
+- **主要特性与技术实现**：
+  - **资源过滤**：通过标签和搜索词过滤资源，并将结果传递给展示组件。
+  - **搜索历史**：记录用户的搜索历史，并支持通过下拉菜单重新选择历史记录。
+  - **动态 UI 控制**：根据过滤结果动态调整标签按钮的可见性，并控制清除按钮的显示状态。
+  - **面板宽度切换**：提供全屏和默认宽度的切换功能，提升用户体验。
+  - **事件驱动**：通过 Unity 的事件系统处理用户交互，如按钮点击和输入框文本变化。
+
+---
+
+### 2. 核心类解析
+
+#### **ResourceFilterResult**
+
+- **职责说明**：该类的主要职责是管理资源过滤器的结果展示和用户交互逻辑。它负责处理用户输入（如搜索词和标签选择）、过滤资源、更新 UI 组件以及维护搜索历史。
+
+- **关键方法清单**：
+  - `private void Start()`：初始化组件和事件监听。
+  - `private void PerformSearch()`：执行搜索操作并更新结果。
+  - `public void FilterAndPrintResources()`：过滤资源并将其传递给展示组件。
+  - `public void ClearAllFilters()`：清除所有过滤条件并重置 UI 状态。
+  - `private void UpdateClearButtonVisibility()`：根据过滤条件的状态更新清除按钮的可见性。
+
+- **继承关系**：
+  ```mermaid
+  ResourceFilterResult --> MonoBehaviour
+  ```
+
+- **依赖模块**：
+  - `ResourceFilter`：用于过滤资源。
+  - `ResourceCardSpawner`：用于展示过滤后的资源卡片。
+  - `MultipleTagButtonCreator`：用于创建和管理标签按钮。
+  - `SearchHistoryDropdownHandler`：用于管理搜索历史下拉菜单。
+  - `AiSearch`：用于处理 AI 搜索请求。
+
+---
+
+### 3. 关键方法详解
+
+#### **`Start()`**
+
+- **方法签名**：`private void Start()`
+- **功能描述**：在脚本初始化时执行，负责初始化组件引用、设置事件监听以及初始状态的配置。
+- **算法说明**：无复杂算法。
+- **调用关系**：由 Unity 引擎在脚本初始化时自动调用，后续可能调用 `FilterAndPrintResources()` 和 `PerformSearch()`。
+
+#### **`PerformSearch()`**
+
+- **方法签名**：`private void PerformSearch()`
+- **功能描述**：处理用户的搜索操作，获取搜索词，更新搜索历史，并重新过滤资源。
+- **算法说明**：无复杂算法。
+- **调用关系**：由 `searchButton.onClick.AddListener(PerformSearch)` 调用，频率取决于用户的点击操作。
+
+#### **`FilterAndPrintResources()`**
+
+- **方法签名**：`public void FilterAndPrintResources()`
+- **功能描述**：根据当前的过滤条件（标签、搜索词、id 列表）过滤资源，并将结果传递给展示组件。
+- **算法说明**：无复杂算法。
+- **调用关系**：被 `Start()`、`UpdateIdList()` 和 `ClearAllFilters()` 调用，频率取决于过滤条件的变更。
+
+#### **`ClearAllFilters()`**
+
+- **方法签名**：`public void ClearAllFilters()`
+- **功能描述**：清除所有过滤条件，并重置 UI 组件的状态。
+- **算法说明**：无复杂算法。
+- **调用关系**：由 `clearButton.onClick.AddListener(ClearAllFilters)` 调用，频率取决于用户的清除操作。
+
+#### **`UpdateClearButtonVisibility()`**
+
+- **方法签名**：`private void UpdateClearButtonVisibility()`
+- **功能描述**：检查当前是否存在过滤条件，更新清除按钮的可见性。
+- **算法说明**：无复杂算法。
+- **调用关系**：被 `FilterAndPrintResources()` 调用，频率取决于过滤条件的变更。
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+  class ResourceFilterResult {
+    +ResourceFilter resourceFilter
+    +ResourceCardSpawner resourceCardSpawner
+    +MultipleTagButtonCreator multipleTagButtonCreator
+    +SearchHistoryDropdownHandler searchHistoryDropdownHandler
+    +AiSearch aiSearch
+    +void Start()
+    +void PerformSearch()
+    +void FilterAndPrintResources()
+    +void ClearAllFilters()
+    +void UpdateClearButtonVisibility()
+    +void UpdateTagButtonVisibility()
+    +void ExtractTagsFromResources()
+    +void ToggleWidth()
+    +void AddSearchHistory()
+    +void ResetTagButtonStates()
+  }
+
+  class ResourceFilter {
+    +List<ResourceCardData> FilterResources()
+    +void PrintFilteredResources()
+  }
+
+  class ResourceCardSpawner {
+    +void SetFilteredResources()
+  }
+
+  class MultipleTagButtonCreator {
+    +void UpdateTagButtonVisibility()
+    +void ResetAllTagButtonStates()
+  }
+
+  class SearchHistoryDropdownHandler {
+    +void UpdateDropdownOptions()
+    +void OnSearchHistorySelected()
+  }
+
+  class AiSearch {
+    +void OnQueryResultReceived()
+  }
+
+  ResourceFilterResult --> ResourceFilter : uses
+  ResourceFilterResult --> ResourceCardSpawner : uses
+  ResourceFilterResult --> MultipleTagButtonCreator : uses
+  ResourceFilterResult --> SearchHistoryDropdownHandler : uses
+  ResourceFilterResult --> AiSearch : uses
+```
+
+---
+
+### 总结
+
+ResourceFilterResult 类是资源管理模块的核心，负责协调资源过滤、搜索、展示以及用户交互逻辑。通过依赖注入和事件驱动的方式，它实现了灵活且易于维护的架构设计。

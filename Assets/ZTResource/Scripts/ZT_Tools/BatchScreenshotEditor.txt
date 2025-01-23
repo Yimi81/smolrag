@@ -1,0 +1,407 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEngine;
+using System.Collections;
+using Unity.EditorCoroutines.Editor;
+using System.IO;
+
+public class BatchScreenshotEditor : EditorWindow
+{
+    private Vector3 cameraDefaultRotation = new Vector3(15f, -45f, 0f); // 默认视图相机角度
+    private Vector3 cameraFrontRotation = new Vector3(15f, 0f, 0f); // 正视图相机角度
+    private Vector3 cameraTopRotation = new Vector3(45f, 0f, 0f); // 顶视图相机角度
+
+    [MenuItem("ZTResource/批量截图", false, 2)]
+    public static void ShowWindow()
+    {
+        GetWindow<BatchScreenshotEditor>("批量截图");
+    }
+
+    private void OnGUI()
+    {
+        GUILayout.Label("截图设置", EditorStyles.boldLabel);
+
+        cameraDefaultRotation = EditorGUILayout.Vector3Field("默认视图角度 (XYZ)", cameraDefaultRotation);
+        cameraFrontRotation = EditorGUILayout.Vector3Field("正视图角度 (XYZ)", cameraFrontRotation);
+        cameraTopRotation = EditorGUILayout.Vector3Field("顶视图角度 (XYZ)", cameraTopRotation);
+
+        if (GUILayout.Button("开始截图"))
+        {
+            StartCaptureScreenshots();
+        }
+    }
+
+    private void StartCaptureScreenshots()
+    {
+        GameObject parentObject = GameObject.Find("Target"); // 替换为实际父物体名称
+        if (parentObject == null)
+        {
+            Debug.LogError("Parent object not found. Please ensure the parent object name is correct.");
+            return;
+        }
+
+        EditorCoroutineUtility.StartCoroutine(CaptureScreenshotsCoroutine(parentObject), this);
+    }
+
+    private IEnumerator CaptureScreenshotsCoroutine(GameObject parentObject)
+    {
+        // 查找并隐藏 reference_role 物体
+        GameObject referenceRole = GameObject.Find("reference_role");
+        if (referenceRole != null)
+        {
+            referenceRole.SetActive(false);
+        }
+        else
+        {
+            Debug.LogError("reference_role not found.");
+        }
+
+        // 获取 Main_Camera
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            Debug.LogError("Main_Camera not found.");
+            yield break;
+        }
+
+        // 保存相机的原始 Field of View、位置和旋转
+        float originalFOV = cam.fieldOfView;
+        Vector3 originalPosition = cam.transform.position;
+        Quaternion originalRotation = cam.transform.rotation;
+
+        // 设置相机 Field of View 为 14
+        cam.fieldOfView = 14;
+
+        int width = 512;
+        int height = 512;
+        int totalChildren = parentObject.transform.childCount;
+
+        SetAllChildrenActive(parentObject, false);
+
+        for (int i = 0; i < totalChildren; i++)
+        {
+            GameObject child = parentObject.transform.GetChild(i).gameObject;
+            child.SetActive(true);
+
+            yield return new WaitForEndOfFrame();
+
+            MeshRenderer[] meshRenderers = child.GetComponentsInChildren<MeshRenderer>();
+            SkinnedMeshRenderer[] skinnedMeshRenderers = child.GetComponentsInChildren<SkinnedMeshRenderer>();
+            if (meshRenderers.Length == 0 && skinnedMeshRenderers.Length == 0)
+            {
+                Debug.LogError($"子物体 {child.name} 没有MeshRenderer或SkinnedMeshRenderer组件。");
+                child.SetActive(false);
+                continue;
+            }
+
+            // 批量截图
+            RenderAndSaveBatchScreenshot(child, cam, width, height);
+
+            // 三视图截图
+            string prefabFolder = CreateFolderForPrefab(child);
+            RenderAndSaveScreenshot(child, cam, width, height, cameraDefaultRotation, Path.Combine(prefabFolder, $"{child.name}_Default.png"));
+            RenderAndSaveScreenshot(child, cam, width, height, cameraFrontRotation, Path.Combine(prefabFolder, $"{child.name}_Front.png"));
+            RenderAndSaveScreenshot(child, cam, width, height, cameraTopRotation, Path.Combine(prefabFolder, $"{child.name}_Top.png"));
+
+            child.SetActive(false);
+
+            float progress = (float)i / totalChildren;
+            EditorUtility.DisplayProgressBar("截图进度", "正在截图: " + child.name, progress);
+
+            yield return new WaitForEndOfFrame();
+        }
+
+        EditorUtility.ClearProgressBar();
+
+        // 恢复 reference_role 物体
+        if (referenceRole != null)
+        {
+            referenceRole.SetActive(true);
+        }
+
+        // 恢复相机的 Field of View、位置和旋转
+        cam.fieldOfView = originalFOV;
+        cam.transform.position = originalPosition;
+        cam.transform.rotation = originalRotation;
+
+        EditorUtility.DisplayDialog("截图完毕", "所有截图已完成！", "确定");
+
+        Debug.Log("Screenshots taken for all children under " + parentObject.name);
+    }
+
+
+
+    private void RenderAndSaveBatchScreenshot(GameObject child, Camera cam, int width, int height)
+    {
+        // 设置相机默认角度
+        cam.transform.rotation = Quaternion.Euler(cameraDefaultRotation);
+
+        // 设置相机背景为黑色（非透明）
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = Color.black; // 黑色背景
+
+        Bounds bounds = GetTotalBounds(child);
+        float distance = bounds.extents.magnitude / Mathf.Sin(Mathf.Deg2Rad * cam.fieldOfView / 2f);
+        Vector3 cameraPosition = bounds.center - cam.transform.forward * distance;
+
+        cam.transform.position = cameraPosition;
+        cam.transform.LookAt(bounds.center);
+
+        RenderTexture rt = new RenderTexture(width, height, 24);
+        cam.targetTexture = rt;
+        Texture2D screenshot = new Texture2D(width, height, TextureFormat.RGB24, false); // 使用RGB24格式，不带透明通道
+        cam.Render();
+        RenderTexture.active = rt;
+        screenshot.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+        screenshot.Apply();
+
+        byte[] bytes = screenshot.EncodeToPNG();
+
+        // 获取Prefab路径
+        string prefabPath = AssetDatabase.GetAssetPath(PrefabUtility.GetCorrespondingObjectFromSource(child));
+        if (string.IsNullOrEmpty(prefabPath))
+        {
+            Debug.LogError($"未找到子物体 {child.name} 的Prefab路径。");
+            return;
+        }
+
+        // 去除路径中的 "Assets/ArtResource/Scenes/Standard/" 部分，并删除 ".prefab" 后缀
+        string relativePath = prefabPath.Replace("Assets/ArtResource/Scenes/Standard/", "").Replace(".prefab", "").Replace("/", "");
+
+        // 设置保存文件路径
+        string filename = string.Format("Assets/ZTResource/Resources/ZT_IconTextures/{0}.png", relativePath);
+        System.IO.File.WriteAllBytes(filename, bytes);
+
+        // 设置图片导入属性为Sprite
+        SetTextureImporterSettings(filename);
+
+        cam.targetTexture = null;
+        RenderTexture.active = null;
+        DestroyImmediate(rt);
+    }
+
+    private void RenderAndSaveScreenshot(GameObject child, Camera cam, int width, int height, Vector3 rotation, string filepath)
+    {
+        cam.transform.rotation = Quaternion.Euler(rotation);
+
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0, 0, 0, 0); // 设置背景为透明
+
+        Bounds bounds = GetTotalBounds(child);
+        float distance = bounds.extents.magnitude / Mathf.Sin(Mathf.Deg2Rad * cam.fieldOfView / 2f);
+        Vector3 cameraPosition = bounds.center - cam.transform.forward * distance;
+
+        cam.transform.position = cameraPosition;
+        cam.transform.LookAt(bounds.center);
+
+        RenderTexture rt = new RenderTexture(width, height, 24);
+        cam.targetTexture = rt;
+        Texture2D screenshot = new Texture2D(width, height, TextureFormat.RGBA32, false); // 使用RGBA32格式，带透明通道
+        cam.Render();
+        RenderTexture.active = rt;
+        screenshot.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+        screenshot.Apply();
+
+        byte[] bytes = screenshot.EncodeToPNG();
+        File.WriteAllBytes(filepath, bytes);
+
+        cam.targetTexture = null;
+        RenderTexture.active = null;
+        DestroyImmediate(rt);
+    }
+
+    private string CreateFolderForPrefab(GameObject child)
+    {
+        string prefabName = child.name;
+        string folderPath = $"Assets/ZTResource/Resources/Al_NeedsTextures/{prefabName}";
+        if (!Directory.Exists(folderPath))
+        {
+            Directory.CreateDirectory(folderPath);
+        }
+        return folderPath;
+    }
+
+    private void SetTextureImporterSettings(string path)
+    {
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+        TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        if (importer != null)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+        }
+    }
+
+    private Bounds GetTotalBounds(GameObject go)
+    {
+        MeshRenderer[] meshRenderers = go.GetComponentsInChildren<MeshRenderer>();
+        SkinnedMeshRenderer[] skinnedMeshRenderers = go.GetComponentsInChildren<SkinnedMeshRenderer>();
+
+        if (meshRenderers.Length == 0 && skinnedMeshRenderers.Length == 0)
+        {
+            return new Bounds(go.transform.position, Vector3.zero);
+        }
+
+        Bounds bounds = new Bounds(go.transform.position, Vector3.zero);
+
+        foreach (var renderer in meshRenderers)
+        {
+            bounds.Encapsulate(renderer.bounds);
+        }
+
+        foreach (var skinnedRenderer in skinnedMeshRenderers)
+        {
+            bounds.Encapsulate(skinnedRenderer.bounds);
+        }
+
+        return bounds;
+    }
+
+    private void SetAllChildrenActive(GameObject parent, bool state)
+    {
+        foreach (Transform child in parent.transform)
+        {
+            child.gameObject.SetActive(state);
+        }
+    }
+}
+#endif
+源代码内容解释如下：
+### 1. 功能概览
+
+- **功能定位**：该代码文件实现了一个用于批量生成游戏物体截图的Unity编辑器扩展工具。用户可以通过该工具快速生成物体的多视角截图，并自动保存至指定路径，同时支持批量处理和截图参数配置。
+
+- **系统角色**：作为Unity编辑器的扩展，该工具在游戏资源生成和预览中扮演重要角色，显著提升了截图生成的效率和一致性。
+
+- **主要特性与技术实现**：
+  - **多视角截图**：支持默认视图、正视图、顶视图三种视角的截图生成。
+  - **批量处理**：可以一次性处理多个子物体，自动生成和保存截图。
+  - **自动化路径管理**：自动创建保存文件夹，并根据Prefab路径生成文件名。
+  - **相机控制**：动态调整相机位置和旋转，确保截图视角正确。
+  - **资源管理**：自动设置截图生成的纹理导入属性。
+
+### 2. 核心类解析
+
+**BatchScreenshotEditor**
+
+- **职责说明**：实现批量截图功能的自定义编辑器窗口，提供用户界面和截图逻辑。
+
+- **关键方法清单**：
+  - `public static void ShowWindow()`：显示编辑器窗口。
+  - `private void OnGUI()`：绘制用户界面。
+  - `private void StartCaptureScreenshots()`：启动截图协程。
+  - `private IEnumerator CaptureScreenshotsCoroutine(GameObject parentObject)`：处理截图逻辑。
+  - `private void RenderAndSaveBatchScreenshot(GameObject child, Camera cam, int width, int height)`：渲染并保存批量截图。
+  - `private void RenderAndSaveScreenshot(GameObject child, Camera cam, int width, int height, Vector3 rotation, string filepath)`：渲染并保存三视图截图。
+  - `private string CreateFolderForPrefab(GameObject child)`：创建预制体文件夹。
+  - `private void SetTextureImporterSettings(string path)`：设置纹理导入属性。
+  - `private Bounds GetTotalBounds(GameObject go)`：计算物体包围盒。
+  - `private void SetAllChildrenActive(GameObject parent, bool state)`：设置子物体激活状态。
+
+- **继承关系**：
+  ```
+  BatchScreenshotEditor -> EditorWindow
+  ```
+
+- **依赖模块**：
+  - `UnityEngine`：用于游戏对象和相机操作。
+  - `UnityEditor`：用于编辑器扩展和资源操作。
+  - `System.IO`：用于文件和目录操作。
+  - `Unity.EditorCoroutines.Editor`：用于协程处理。
+
+### 3. 关键方法详解
+
+**1. `ShowWindow`**
+
+- **方法签名**：`[MenuItem("ZTResource/批量截图", false, 2)] public static void ShowWindow()`
+- **功能描述**：通过Unity的MenuItem属性，添加一个菜单项，点击后显示BatchScreenshotEditor窗口。
+- **调用关系**：由Unity编辑器调用，作为用户入口。
+
+**2. `OnGUI`**
+
+- **方法签名**：`private void OnGUI()`
+- **功能描述**：绘制编辑器窗口的用户界面，包括标签、输入框和按钮。用户可以通过输入框调整相机角度，并点击按钮启动截图过程。
+- **调用关系**：由Unity编辑器周期性调用，维护界面显示。
+
+**3. `StartCaptureScreenshots`**
+
+- **方法签名**：`private void StartCaptureScreenshots()`
+- **功能描述**：查找目标父物体，并启动截图协程。如果未找到目标物体，显示错误信息。
+- **调用关系**：由`OnGUI`中的按钮点击事件调用。
+
+**4. `CaptureScreenshotsCoroutine`**
+
+- **方法签名**：`private IEnumerator CaptureScreenshotsCoroutine(GameObject parentObject)`
+- **功能描述**：处理截图的主逻辑，包括隐藏参考物体、相机设置、遍历子物体、渲染截图、进度显示和恢复状态。
+- **算法说明**：使用协程处理长时间任务，避免阻塞主线程。使用包围盒计算相机位置，确保物体在画面中居中。
+- **调用关系**：由`StartCaptureScreenshots`启动。
+
+**5. `RenderAndSaveBatchScreenshot`**
+
+- **方法签名**：`private void RenderAndSaveBatchScreenshot(GameObject child, Camera cam, int width, int height)`
+- **功能描述**：渲染并保存批量截图，设置相机角度和背景颜色，计算包围盒确定相机位置，生成纹理并保存为PNG。
+- **调用关系**：由`CaptureScreenshotsCoroutine`调用，处理每个子物体的批量截图。
+
+**6. `RenderAndSaveScreenshot`**
+
+- **方法签名**：`private void RenderAndSaveScreenshot(GameObject child, Camera cam, int width, int height, Vector3 rotation, string filepath)`
+- **功能描述**：渲染并保存三视图截图，根据传入的旋转角度设置相机，生成纹理并保存。
+- **调用关系**：由`CaptureScreenshotsCoroutine`调用，处理每个子物体的三视图截图。
+
+**7. `CreateFolderForPrefab`**
+
+- **方法签名**：`private string CreateFolderForPrefab(GameObject child)`
+- **功能描述**：为每个预制体创建保存文件夹，确保截图保存路径正确。
+- **调用关系**：由`CaptureScreenshotsCoroutine`调用，处理截图保存路径。
+
+**8. `SetTextureImporterSettings`**
+
+- **方法签名**：`private void SetTextureImporterSettings(string path)`
+- **功能描述**：设置生成的纹理为Sprite类型，以便在Unity中正确显示。
+- **调用关系**：由`RenderAndSaveBatchScreenshot`调用，处理纹理导入属性。
+
+**9. `GetTotalBounds`**
+
+- **方法签名**：`private Bounds GetTotalBounds(GameObject go)`
+- **功能描述**：计算物体及其子物体的包围盒，用于确定相机的位置和视角。
+- **调用关系**：由`RenderAndSaveBatchScreenshot`和`RenderAndSaveScreenshot`调用，计算相机参数。
+
+**10. `SetAllChildrenActive`**
+
+- **方法签名**：`private void SetAllChildrenActive(GameObject parent, bool state)`
+- **功能描述**：设置父物体下所有子物体的激活状态，避免渲染时出现不需要的物体。
+- **调用关系**：由`CaptureScreenshotsCoroutine`调用，控制子物体的可见性。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class BatchScreenshotEditor {
+        +ShowWindow()
+        +OnGUI()
+        +StartCaptureScreenshots()
+        +CaptureScreenshotsCoroutine(GameObject)
+        +RenderAndSaveBatchScreenshot(GameObject, Camera, int, int)
+        +RenderAndSaveScreenshot(GameObject, Camera, int, int, Vector3, string)
+        +CreateFolderForPrefab(GameObject)
+        +SetTextureImporterSettings(string)
+        +GetTotalBounds(GameObject)
+        +SetAllChildrenActive(GameObject, bool)
+        #cameraDefaultRotation
+        #cameraFrontRotation
+        #cameraTopRotation
+    }
+
+    BatchScreenshotEditor --|> EditorWindow
+    BatchScreenshotEditor --* GameObject
+    BatchScreenshotEditor --* Camera
+    BatchScreenshotEditor --* Transform
+    BatchScreenshotEditor --* MeshRenderer
+    BatchScreenshotEditor --* SkinnedMeshRenderer
+    BatchScreenshotEditor --* RenderTexture
+    BatchScreenshotEditor --* Texture2D
+    BatchScreenshotEditor --* AssetDatabase
+    BatchScreenshotEditor --* EditorCoroutineUtility
+```

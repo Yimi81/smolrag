@@ -1,0 +1,144 @@
+文件源代码内容如下：
+﻿// Copyright (C) 2015-2021 gamevanilla - All rights reserved.
+// This code can only be used under the standard Unity Asset Store End User License Agreement.
+// A Copy of the Asset Store EULA is available at http://unity3d.com/company/legal/as_terms.
+
+using UnityEngine;
+
+namespace UltimateClean
+{
+    /// <summary>
+    /// This component goes together with a button object and contains
+    /// the audio clips to play when the player rolls over and presses it.
+    /// </summary>
+    [RequireComponent(typeof(AudioSource))]
+    public class ButtonSounds : MonoBehaviour
+    {
+        public AudioClip pressedSound;
+        public AudioClip rolloverSound;
+
+        private AudioSource audioSource;
+
+        private void Awake()
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+
+        public void PlayPressedSound()
+        {
+            audioSource.clip = pressedSound;
+            audioSource.Play();
+        }
+
+        public void PlayRolloverSound()
+        {
+            audioSource.clip = rolloverSound;
+            audioSource.Play();
+        }
+    }
+}
+源代码内容解释如下：
+### 功能概览
+
+- **功能定位**：ButtonSounds 是一个 Unity 脚本组件，用于为按钮对象提供音效播放功能。它能够播放按钮被点击时的音效（pressedSound）和鼠标悬停时的音效（rolloverSound）。
+
+- **角色和重要性**：在 Interactive System 中，ButtonSounds 负责提升用户交互体验，通过音效反馈增强用户对按钮操作的感知。它是 UI 交互系统中的重要组成部分。
+
+- **主要特性与技术实现**：
+  - **支持的特性**：
+    - 播放按钮点击音效
+    - 播放鼠标悬停音效
+  - **技术实现**：
+    - 使用 Unity 的 AudioSource 组件播放音频
+    - 通过 MonoBehaviour 生命周期方法 Awake 初始化组件
+
+---
+
+### 核心类解析
+**类名称**：ButtonSounds
+
+- **职责说明**：ButtonSounds 的设计目的是为按钮对象提供音效播放功能。它通过 AudioSource 组件播放指定的音频剪辑，增强用户交互体验。
+
+- **关键方法清单**：
+  - `private void Awake()`：初始化 AudioSource 组件
+  - `public void PlayPressedSound()`：播放按钮点击音效
+  - `public void PlayRolloverSound()`：播放鼠标悬停音效
+
+- **继承关系**：
+  ```
+  ButtonSounds -> MonoBehaviour
+  ```
+
+- **依赖模块**：
+  - 内部依赖：
+    - `AudioSource`（Unity 组件）
+  - 可能的外部依赖：
+    - 其他脚本（如 ButtonController）可能调用 PlayPressedSound 和 PlayRolloverSound 方法
+
+---
+
+### 关键方法详解
+
+#### 方法：`private void Awake()`
+
+- **方法签名**：`private void Awake()`
+
+- **功能描述**：在 MonoBehaviour 初始化时调用，用于获取并初始化 AudioSource 组件。
+
+- **算法说明**：简单直接，通过 GetComponent<AudioSource>() 获取 AudioSource 组件并赋值给私有变量 audioSource。
+
+- **调用关系**：由 Unity 引擎自动调用，频率为一次（脚本初始化时）。
+
+---
+
+#### 方法：`public void PlayPressedSound()`
+
+- **方法签名**：`public void PlayPressedSound()`
+
+- **功能描述**：设置并播放按钮点击音效（pressedSound）。该方法通常在按钮点击事件（如 OnClick）中被调用。
+
+- **算法说明**：将 audioSource 的 clip 设置为 pressedSound，然后调用 Play() 方法播放音频。
+
+- **调用关系**：可能由其他脚本（如 ButtonController）在按钮点击事件中调用，调用频率取决于按钮被点击的次数。
+
+---
+
+#### 方法：`public void PlayRolloverSound()`
+
+- **方法签名**：`public void PlayRolloverSound()`
+
+- **功能描述**：设置并播放鼠标悬停音效（rolloverSound）。该方法通常在鼠标悬停事件（如 OnMouseOver）中被调用。
+
+- **算法说明**：将 audioSource 的 clip 设置为 rolloverSound，然后调用 Play() 方法播放音频。
+
+- **调用关系**：可能由其他脚本（如 ButtonController）在鼠标悬停事件中调用，调用频率取决于鼠标悬停的次数。
+
+---
+
+### 架构关系图
+
+```mermaid
+classDiagram
+
+  class ButtonSounds {
+    +AudioClip pressedSound
+    +AudioClip rolloverSound
+    +AudioSource audioSource
+    +void Awake()
+    +void PlayPressedSound()
+    +void PlayRolloverSound()
+  }
+
+  class MonoBehaviour {
+    // MonoBehaviour 是 Unity 的基类，提供生命周期管理等功能
+  }
+
+  ButtonSounds --|> MonoBehaviour : 继承
+  ButtonSounds *-- AudioSource : 依赖
+```
+
+---
+
+### 总结
+
+ButtonSounds 是一个简单但功能明确的脚本，用于为按钮对象提供音效反馈。它通过 MonoBehaviour 的生命周期方法 Awake 初始化 AudioSource 组件，并通过 PlayPressedSound 和 PlayRolloverSound 方法播放音效。在实际项目中，ButtonSounds 通常与按钮控制器脚本（如 ButtonController）配合使用，以实现完整的按钮交互功能。

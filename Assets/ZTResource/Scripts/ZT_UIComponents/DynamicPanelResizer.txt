@@ -1,0 +1,124 @@
+文件源代码内容如下：
+using UnityEngine;
+using UnityEngine.UI;
+
+public class DynamicPanelResizer : MonoBehaviour
+{
+    public RectTransform mainPanel; // 主Panel
+    public RectTransform tagPanel; // Panel_标签
+    public RectTransform searchResultsPanel; // Panel_搜索结果
+
+    private float lastTagPanelHeight = -1f; // 存储上一次Panel_标签的高度
+
+    void Update()
+    {
+        // 检查Panel_标签的高度是否发生了变化
+        if (tagPanel.rect.height != lastTagPanelHeight)
+        {
+            lastTagPanelHeight = tagPanel.rect.height; // 更新存储的高度
+            AdjustSearchResultsPanel(); // 调整Panel_搜索结果的大小
+        }
+    }
+
+    void AdjustSearchResultsPanel()
+    {
+        // 计算Panel_搜索结果的新高度
+        float newHeight = mainPanel.rect.height - tagPanel.rect.height;
+
+        // 设置Panel_搜索结果的高度
+        searchResultsPanel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, newHeight);
+    }
+}
+源代码内容解释如下：
+### 1. 功能概览
+
+**功能定位**  
+该代码文件实现了动态调整面板大小的功能，用于在Unity游戏引擎中自适应布局。  
+**系统角色**  
+作为UI布局管理的一部分，该类通过监听标签面板的高度变化，动态调整搜索结果面板的大小，确保整体UI布局的协调性和美观性。  
+**主要特性与技术实现**  
+- 高度自适应：根据标签面板的高度变化调整搜索结果面板的高度  
+- 使用Unity的RectTransform进行布局控制  
+- 采用Update方法进行持续检测  
+
+---
+
+### 2. 核心类解析
+
+#### `DynamicPanelResizer`
+
+**职责说明**  
+该类用于动态调整UI面板的大小，确保主面板、标签面板和搜索结果面板之间的布局协调。  
+**关键方法清单**  
+- `void Update()`：持续检测标签面板的高度变化  
+- `void AdjustSearchResultsPanel()`：调整搜索结果面板的大小  
+**继承关系**  
+```
+DynamicPanelResizer -> MonoBehaviour
+```
+**依赖模块**  
+- `UnityEngine.RectTransform`  
+- `UnityEngine.UI`  
+
+---
+
+### 3. 关键方法详解
+
+#### `void Update()`
+
+**方法签名**  
+```csharp
+void Update()
+```
+
+**功能描述**  
+该方法在每帧更新时检查标签面板的高度变化。如果高度发生变化，则更新存储的高度值，并调用`AdjustSearchResultsPanel()`方法调整搜索结果面板的大小。  
+
+**算法说明**  
+- 每帧检测标签面板的高度  
+- 通过比较当前高度和存储的高度判断是否需要调整  
+- 如果需要调整，则调用调整方法  
+
+**调用关系**  
+- 被Unity引擎每帧调用  
+
+---
+
+#### `void AdjustSearchResultsPanel()`
+
+**方法签名**  
+```csharp
+void AdjustSearchResultsPanel()
+```
+
+**功能描述**  
+该方法计算并设置搜索结果面板的新高度。新高度为主面板高度减去标签面板高度。  
+
+**算法说明**  
+- 计算新高度：`mainPanel.rect.height - tagPanel.rect.height`  
+- 使用`SetSizeWithCurrentAnchors`方法设置搜索结果面板的新高度  
+
+**调用关系**  
+- 被`Update()`方法调用  
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class DynamicPanelResizer {
+        +public RectTransform mainPanel
+        +public RectTransform tagPanel
+        +public RectTransform searchResultsPanel
+        +private float lastTagPanelHeight
+        +void Update()
+        +void AdjustSearchResultsPanel()
+    }
+    class MonoBehaviour
+    DynamicPanelResizer --> MonoBehaviour
+```  
+
+**说明**  
+- `DynamicPanelResizer`继承自`MonoBehaviour`，实现了Unity脚本的行为  
+- 依赖于`RectTransform`用于布局控制

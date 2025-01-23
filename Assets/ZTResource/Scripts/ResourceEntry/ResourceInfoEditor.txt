@@ -1,0 +1,489 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEditor;
+using UnityEngine;
+
+[CustomEditor(typeof(ResourceInfo))]
+public class ResourceInfoEditor : Editor
+{
+    private SerializedProperty idProp, resourceNameProp, resourceDescriptionProp, thumbnailPathProp, modelFacesProp, creationDateProp, updatedDateProp, versionProp, itemHeightProp;
+    private SerializedProperty typeTagsProp, themeTagsProp, functionTagsProp, definitionTagsProp, batchTagsProp, propertyTagsProp;
+
+    private TagLibrary typeTagLibrary, themeTagLibrary, functionTagLibrary, definitionTagLibrary, batchTagLibrary, propertyTagLibrary;
+    private int typeTagPageIndex = 0, themeTagPageIndex = 0, functionTagPageIndex = 0, definitionTagPageIndex = 0, batchTagPageIndex = 0, propertyTagPageIndex = 0;
+    private string searchFilter = "";
+    private Dictionary<string, string> searchFilters = new Dictionary<string, string>();
+
+    public void OnEnable()
+    {
+        typeTagLibrary = LoadTagLibrary("TypeTagLibrary");
+        themeTagLibrary = LoadTagLibrary("ThemeTagLibrary");
+        functionTagLibrary = LoadTagLibrary("FunctionTagLibrary");
+        definitionTagLibrary = LoadTagLibrary("DefinitionTagLibrary");
+        batchTagLibrary = LoadTagLibrary("BatchTagLibrary");
+        propertyTagLibrary = LoadTagLibrary("PropertyTagLibrary");
+
+        idProp = serializedObject.FindProperty("id");
+        resourceNameProp = serializedObject.FindProperty("resourceName");
+        resourceDescriptionProp = serializedObject.FindProperty("resourceDescription");
+        thumbnailPathProp = serializedObject.FindProperty("thumbnailPath");
+        modelFacesProp = serializedObject.FindProperty("modelFaces");
+        itemHeightProp = serializedObject.FindProperty("itemHeight");
+        creationDateProp = serializedObject.FindProperty("creationDate");
+        updatedDateProp = serializedObject.FindProperty("updatedDate");
+        versionProp = serializedObject.FindProperty("version");
+        typeTagsProp = serializedObject.FindProperty("typeTags");
+        themeTagsProp = serializedObject.FindProperty("themeTags");
+        functionTagsProp = serializedObject.FindProperty("functionTags");
+        definitionTagsProp = serializedObject.FindProperty("definitionTags");
+        batchTagsProp = serializedObject.FindProperty("batchTags");
+        propertyTagsProp = serializedObject.FindProperty("propertyTags");
+
+
+        searchFilters["Type"] = "";
+        searchFilters["Theme"] = "";
+        searchFilters["Function"] = "";
+        searchFilters["Definition"] = "";
+        searchFilters["Batch"] = "";
+        searchFilters["Property"] = "";
+    }
+
+    public override void OnInspectorGUI()
+    {
+        ResourceInfo resourceInfo = (ResourceInfo)target;
+
+        if (resourceInfo == null)
+        {
+            EditorGUILayout.HelpBox("ResourceInfo is null", MessageType.Error);
+            return;
+        }
+
+        serializedObject.Update();
+        GUI.color = Color.cyan;
+
+        if (GUILayout.Button("<b><color=yellow>资源版本更新</color></b>", new GUIStyle(GUI.skin.button) { richText = true }))
+        {
+            resourceInfo.updatedDate = DateTime.Now.ToString("yyyy/MM/dd");
+            int version = int.Parse(resourceInfo.version);
+            resourceInfo.version = (version + 1).ToString();
+            EditorUtility.SetDirty(resourceInfo);
+        }
+
+        // 恢复GUI颜色为默认值
+        GUI.color = Color.white;
+        EditorGUILayout.PropertyField(idProp, new GUIContent("ID"));
+        EditorGUILayout.PropertyField(resourceNameProp, new GUIContent("名称"));
+        EditorGUILayout.PropertyField(resourceDescriptionProp, new GUIContent("资源"));
+        EditorGUILayout.PropertyField(modelFacesProp, new GUIContent("面数"));
+        EditorGUILayout.PropertyField(itemHeightProp, new GUIContent("长、宽、高"));
+        EditorGUILayout.PropertyField(creationDateProp, new GUIContent("创建日期"));
+        EditorGUILayout.PropertyField(updatedDateProp, new GUIContent("更新时间"));
+        EditorGUILayout.PropertyField(versionProp, new GUIContent("版本"));
+
+        EditorGUILayout.LabelField("缩略图");
+
+        // 调用新的展示缩略图方法，避免标记为脏
+        RefreshThumbnailAndDisplay();
+
+        if (GUILayout.Button("更新信息"))
+        {
+            RefreshData();
+        }
+
+        EditorGUI.BeginChangeCheck();
+        searchFilter = EditorGUILayout.TextField("搜索所有标签", searchFilter).ToLower();
+        if (EditorGUI.EndChangeCheck())
+        {
+            ResetAllPageIndexes();
+            UpdateSearchFilters(searchFilter);
+        }
+
+        DisplayTagSelectionWithPaging("类型标签", typeTagLibrary, ref typeTagPageIndex, typeTagsProp);
+        DisplayTagSelectionWithPaging("主题标签", themeTagLibrary, ref themeTagPageIndex, themeTagsProp);
+        DisplayTagSelectionWithPaging("区域分类", definitionTagLibrary, ref definitionTagPageIndex, definitionTagsProp);
+        DisplayTagSelectionWithPaging("功能标签", functionTagLibrary, ref functionTagPageIndex, functionTagsProp);
+        DisplayTagSelectionWithPaging("批次标签", batchTagLibrary, ref batchTagPageIndex, batchTagsProp);
+        DisplayTagSelectionWithPaging("属性标签", propertyTagLibrary, ref propertyTagPageIndex, propertyTagsProp);
+
+        serializedObject.ApplyModifiedProperties();
+    }
+
+
+    private void RefreshThumbnailAndDisplay()
+    {
+        ResourceInfo resourceInfo = (ResourceInfo)target;
+
+        if (resourceInfo == null)
+        {
+            Debug.LogWarning("ResourceInfo 脚本未找到！");
+            return;
+        }
+
+        // 获取预制体的路径
+        string prefabPath = AssetDatabase.GetAssetPath(resourceInfo.gameObject);
+        if (string.IsNullOrEmpty(prefabPath) || !prefabPath.EndsWith(".prefab"))
+        {
+            return;
+        }
+
+        // 删除路径中的“/”符号并去除公共部分路径
+        string basePath = "Assets/ArtResource/Scenes/Standard/";
+        if (prefabPath.StartsWith(basePath))
+        {
+            prefabPath = prefabPath.Substring(basePath.Length);
+        }
+
+        string modifiedPrefabPath = prefabPath.Replace("/", "");
+        string ThumbnailName = System.IO.Path.GetFileNameWithoutExtension(modifiedPrefabPath);
+
+        // 构建缩略图路径
+        string thumbnailPath = $"Assets/ZTResource/Resources/ZT_IconTextures/{ThumbnailName}.png";
+        Texture2D newThumbnail = AssetDatabase.LoadAssetAtPath<Texture2D>(thumbnailPath);
+
+        if (newThumbnail)
+        {
+            // 直接显示图片，不修改 SerializedProperty
+            GUILayout.Label("缩略图预览：");
+            GUILayout.Label(newThumbnail, GUILayout.Width(100), GUILayout.Height(100));
+        }
+        else
+        {
+            // 自定义样式：红色加粗字体
+            GUIStyle redBoldStyle = new GUIStyle(EditorStyles.boldLabel);
+            redBoldStyle.normal.textColor = Color.yellow;
+            redBoldStyle.fontSize = 14;
+
+            // 显示提示信息，未找到对应缩略图
+            GUILayout.Label("未找到对应缩略图,在资源录入前一定要先截图", redBoldStyle);
+        }
+    }
+
+
+    private void RefreshData()
+    {
+        ResourceInfo resourceInfo = (ResourceInfo)target;
+        if (resourceInfo != null && resourceInfo.gameObject != null)
+        {
+            string prefabPath = AssetDatabase.GetAssetPath(resourceInfo.gameObject);
+            string basePath = "Assets/ArtResource/Scenes/Standard/";
+
+            if (prefabPath.StartsWith(basePath))
+            {
+                prefabPath = prefabPath.Substring(basePath.Length);
+            }
+
+            string prefabPathWithoutExtension = System.IO.Path.ChangeExtension(prefabPath, null);
+            idProp.stringValue = prefabPathWithoutExtension;
+
+            string facesCount = CalculateModelFaces(resourceInfo.gameObject);
+            modelFacesProp.stringValue = facesCount;
+
+            string dimensions = CalculatePrefabDimensions(resourceInfo.gameObject);
+            itemHeightProp.stringValue = dimensions;
+
+            // 删除过时的缩略图路径更新逻辑，仅记录 ThumbnailName
+            string modifiedPrefabPath = prefabPath.Replace("/", "");
+            string ThumbnailName = System.IO.Path.GetFileNameWithoutExtension(modifiedPrefabPath);
+
+            // 记录 ThumbnailName（假设你有一个对应的字段）
+            resourceInfo.thumbnailPath = ThumbnailName;  // 假设有一个名为 thumbnailName 的字段
+
+            thumbnailPathProp.stringValue = ThumbnailName;
+
+            serializedObject.ApplyModifiedProperties();
+            Debug.Log($"更新后的 ThumbnailName: {ThumbnailName}");
+            Debug.Log($"更新后的 thumbnailPath: {resourceInfo.thumbnailPath}");
+        }
+    }
+
+
+    private TagLibrary LoadTagLibrary(string libraryName)
+    {
+        return AssetDatabase.LoadAssetAtPath<TagLibrary>($"Assets/ZTResource/Resources/ZT_TagLibrary/{libraryName}.asset");
+    }
+
+    private void DisplayTagSelectionWithPaging(string label, TagLibrary tagLibrary, ref int pageIndex, SerializedProperty tagsProp)
+    {
+        if (tagLibrary == null)
+        {
+            EditorGUILayout.HelpBox("标签库未找到。请确保TagLibrary对象已经创建并且路径正确。", MessageType.Error);
+            return;
+        }
+
+        EditorGUILayout.LabelField(label);
+        int itemsPerPage = 35;
+        int columns = 4;
+
+        string searchFilterKey = label.Replace(" ", "");
+        if (!searchFilters.ContainsKey(searchFilterKey))
+        {
+            searchFilters[searchFilterKey] = "";
+        }
+
+        IEnumerable<string> filteredTags = tagLibrary.tags.Where(tag => tag.ToLower().Contains(searchFilters[searchFilterKey]));
+        int totalTags = filteredTags.Count();
+        int totalPages = (totalTags + itemsPerPage - 1) / itemsPerPage;
+
+        int startIdx = pageIndex * itemsPerPage;
+        int endIdx = Mathf.Min(startIdx + itemsPerPage, totalTags);
+
+        for (int i = startIdx; i < endIdx; i++)
+        {
+            if ((i - startIdx) % columns == 0)
+            {
+                EditorGUILayout.BeginHorizontal();
+            }
+
+            bool present = IsTagPresent(tagsProp, filteredTags.ElementAt(i - startIdx));
+            bool toggled = GUILayout.Toggle(present, filteredTags.ElementAt(i - startIdx), "Button", GUILayout.Width(EditorGUIUtility.currentViewWidth / columns - 10));
+
+            if (toggled != present)
+            {
+                if (toggled)
+                    AddTag(tagsProp, filteredTags.ElementAt(i - startIdx));
+                else
+                    RemoveTag(tagsProp, filteredTags.ElementAt(i - startIdx));
+            }
+
+            if ((i - startIdx + 1) % columns == 0 || i == endIdx - 1)
+            {
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+
+        if (totalPages > 1)
+        {
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("上一页") && pageIndex > 0)
+            {
+                pageIndex--;
+            }
+            if (GUILayout.Button("下一页") && pageIndex < totalPages - 1)
+            {
+                pageIndex++;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.LabelField($"页码: {pageIndex + 1} / {totalPages}", EditorStyles.centeredGreyMiniLabel);
+        }
+    }
+
+    private bool IsTagPresent(SerializedProperty tagsProp, string tag)
+    {
+        for (int i = 0; i < tagsProp.arraySize; i++)
+        {
+            if (tagsProp.GetArrayElementAtIndex(i).stringValue == tag)
+                return true;
+        }
+        return false;
+    }
+
+    private void AddTag(SerializedProperty tagsProp, string tag)
+    {
+        tagsProp.arraySize++;
+        tagsProp.GetArrayElementAtIndex(tagsProp.arraySize - 1).stringValue = tag;
+    }
+
+    private void RemoveTag(SerializedProperty tagsProp, string tag)
+    {
+        for (int i = 0; i < tagsProp.arraySize; i++)
+        {
+            if (tagsProp.GetArrayElementAtIndex(i).stringValue == tag)
+            {
+                tagsProp.DeleteArrayElementAtIndex(i);
+                return;
+            }
+        }
+    }
+
+    private void ResetAllPageIndexes()
+    {
+        typeTagPageIndex = themeTagPageIndex = functionTagPageIndex = definitionTagPageIndex = batchTagPageIndex = propertyTagPageIndex = 0;
+    }
+
+    private void UpdateSearchFilters(string newFilter)
+    {
+        searchFilters["Type"] = searchFilters["Theme"] = searchFilters["Function"] = searchFilters["Definition"] = searchFilters["Batch"] = searchFilters["Property"] = newFilter;
+    }
+
+    private string CalculateModelFaces(GameObject prefab)
+    {
+        int totalFaces = 0;
+        MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>();
+        foreach (MeshFilter meshFilter in meshFilters)
+        {
+            if (meshFilter.sharedMesh != null)
+            {
+                totalFaces += meshFilter.sharedMesh.triangles.Length / 3;
+            }
+        }
+        return totalFaces.ToString();
+    }
+
+    private string CalculatePrefabDimensions(GameObject prefab)
+    {
+        Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>();
+
+        if (renderers.Length == 0)
+        {
+            Debug.Log("预制体中没有找到任何模型");
+            return string.Empty;
+        }
+
+        Bounds overallBounds = renderers[0].bounds;
+
+        foreach (Renderer renderer in renderers)
+        {
+            overallBounds.Encapsulate(renderer.bounds);
+        }
+
+        float length = Mathf.Round(overallBounds.size.x * 10) / 10f;
+        float width = Mathf.Round(overallBounds.size.z * 10) / 10f;
+        float height = Mathf.Round(overallBounds.size.y * 10) / 10f;
+
+        return $"{length}|{width}|{height}";
+    }
+}
+
+#endif
+
+源代码内容解释如下：
+```markdown
+# 代码分析报告
+
+## 1. 功能概览
+
+### 功能定位
+该代码文件是一个Unity编辑器扩展脚本，用于自定义`ResourceInfo`类的Inspector面板。它提供了对资源信息的编辑、标签管理、缩略图预览以及版本控制等功能。
+
+### 在系统中的角色
+该脚本在Unity项目中担任资源管理工具的角色，帮助开发者更高效地管理和更新资源信息。它通过自定义Inspector面板，提供了一个用户友好的界面，便于资源的维护和更新。
+
+### 主要特性与技术实现
+- **自定义Inspector面板**：通过`CustomEditor`属性实现对`ResourceInfo`类的自定义编辑界面。
+- **标签管理**：支持多种类型的标签管理，包括类型标签、主题标签、功能标签等，并通过分页显示和搜索功能提升用户体验。
+- **资源信息自动更新**：能够自动计算和更新资源的面数、尺寸等信息。
+- **版本控制**：提供资源版本更新功能，自动记录更新时间和版本号。
+- **缩略图预览**：支持缩略图的加载和显示，并提供缺失提示。
+
+## 2. 核心类解析
+
+### `ResourceInfoEditor`类
+
+#### 职责说明
+该类的主要职责是为`ResourceInfo`类提供一个自定义的Inspector编辑界面。它实现了对资源信息的编辑、标签管理、缩略图预览以及版本控制等功能。
+
+#### 关键方法清单
+- `public override void OnInspectorGUI()`
+- `private void RefreshThumbnailAndDisplay()`
+- `private void RefreshData()`
+- `private TagLibrary LoadTagLibrary(string libraryName)`
+- `private void DisplayTagSelectionWithPaging(string label, TagLibrary tagLibrary, ref int pageIndex, SerializedProperty tagsProp)`
+- `private bool IsTagPresent(SerializedProperty tagsProp, string tag)`
+- `private void AddTag(SerializedProperty tagsProp, string tag)`
+- `private void RemoveTag(SerializedProperty tagsProp, string tag)`
+- `private void ResetAllPageIndexes()`
+- `private void UpdateSearchFilters(string newFilter)`
+- `private string CalculateModelFaces(GameObject prefab)`
+- `private string CalculatePrefabDimensions(GameObject prefab)`
+
+#### 继承关系
+```
+ResourceInfoEditor -> Editor
+```
+
+#### 依赖模块
+- `UnityEngine`
+- ` UnityEditor`
+- `System.Collections.Generic`
+- `System.Linq`
+- 内部依赖：
+  - `ResourceInfo`类
+  - `TagLibrary`类
+
+## 3. 关键方法详解
+
+### `OnInspectorGUI()`
+#### 方法签名
+```csharp
+public override void OnInspectorGUI()
+```
+
+#### 功能描述
+该方法负责绘制自定义的Inspector界面。它显示了资源的基本信息、标签选择界面、缩略图预览以及版本更新按钮等功能。
+
+#### 调用关系
+- 被Unity编辑器自动调用以绘制Inspector面板。
+- 调用`RefreshThumbnailAndDisplay()`、`RefreshData()`等方法以更新界面内容。
+
+### `RefreshThumbnailAndDisplay()`
+#### 方法签名
+```csharp
+private void RefreshThumbnailAndDisplay()
+```
+
+#### 功能描述
+该方法负责加载并显示资源的缩略图。如果缩略图不存在，则显示提示信息。
+
+#### 调用关系
+- 在`OnInspectorGUI()`中被调用以更新缩略图显示。
+
+### `RefreshData()`
+#### 方法签名
+```csharp
+private void RefreshData()
+```
+
+#### 功能描述
+该方法更新资源的信息，包括ID、面数、尺寸等，并应用修改。
+
+#### 调用关系
+- 在`OnInspectorGUI()`中被调用，当用户点击“更新信息”按钮时触发。
+
+### `DisplayTagSelectionWithPaging()`
+#### 方法签名
+```csharp
+private void DisplayTagSelectionWithPaging(string label, TagLibrary tagLibrary, ref int pageIndex, SerializedProperty tagsProp)
+```
+
+#### 功能描述
+该方法显示标签选择界面，并支持分页浏览。用户可以通过该界面添加或移除标签。
+
+#### 调用关系
+- 在`OnInspectorGUI()`中被调用以显示不同类型的标签选择界面。
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+    class ResourceInfoEditor {
+        +void OnInspectorGUI()
+        +void RefreshThumbnailAndDisplay()
+        +void RefreshData()
+        +TagLibrary LoadTagLibrary(string)
+        +void DisplayTagSelectionWithPaging(string, TagLibrary, ref int, SerializedProperty)
+        +bool IsTagPresent(SerializedProperty, string)
+        +void AddTag(SerializedProperty, string)
+        +void RemoveTag(SerializedProperty, string)
+        +void ResetAllPageIndexes()
+        +void UpdateSearchFilters(string)
+        +string CalculateModelFaces(GameObject)
+        +string CalculatePrefabDimensions(GameObject)
+    }
+    ResourceInfoEditor --> Editor
+    ResourceInfoEditor *-- TagLibrary
+    ResourceInfoEditor *-- ResourceInfo
+```
+
+### 说明
+- `ResourceInfoEditor`类继承自`Editor`类，负责自定义Inspector面板的绘制。
+- 该类依赖`TagLibrary`类来管理标签数据，依赖`ResourceInfo`类来获取和更新资源信息。
+- 通过`SerializedProperty`类实现对资源字段的绑定和操作。
+
+## 5. 总结
+
+该代码文件通过自定义的Inspector面板，为`ResourceInfo`类提供了丰富的编辑和管理功能。它不仅支持基本的字段编辑，还提供了标签管理、缩略图预览、版本控制等功能，极大地方便了资源的维护和更新。通过合理的继承和依赖关系，该类实现了高度的模块化和可扩展性，能够适应不同的项目需求。

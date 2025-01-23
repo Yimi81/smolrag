@@ -1,0 +1,162 @@
+文件源代码内容如下：
+﻿// Copyright (C) 2015-2021 gamevanilla - All rights reserved.
+// This code can only be used under the standard Unity Asset Store End User License Agreement.
+// A Copy of the Asset Store EULA is available at http://unity3d.com/company/legal/as_terms.
+
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+namespace UltimateClean
+{
+    /// <summary>
+    /// The base button component used in the kit that provides the ability to
+    /// (optionally) play sounds when the user rolls over/presses it.
+    /// </summary>
+    public class CleanButton : Button
+    {
+        private ButtonSounds buttonSounds;
+        private bool pointerWasUp;
+
+        protected override void Awake()
+        {
+            base.Awake();
+            buttonSounds = GetComponent<ButtonSounds>();
+        }
+
+        public override void OnPointerClick(PointerEventData eventData)
+        {
+            if (buttonSounds != null && interactable)
+            {
+                buttonSounds.PlayPressedSound();
+            }
+            base.OnPointerClick(eventData);
+        }
+
+        public override void OnPointerUp(PointerEventData eventData)
+        {
+            pointerWasUp = true;
+            base.OnPointerUp(eventData);
+        }
+
+        public override void OnPointerEnter(PointerEventData eventData)
+        {
+            if (pointerWasUp)
+            {
+                pointerWasUp = false;
+                base.OnPointerEnter(eventData);
+            }
+            else
+            {
+                if (buttonSounds != null && interactable)
+                {
+                    buttonSounds.PlayRolloverSound();
+                }
+                base.OnPointerEnter(eventData);
+            }
+        }
+
+        public override void OnPointerExit(PointerEventData eventData)
+        {
+            pointerWasUp = false;
+            base.OnPointerExit(eventData);
+        }
+    }
+}
+源代码内容解释如下：
+### 1. 功能概览
+
+CleanButton是一个扩展自Unity标准Button组件的自定义按钮类，主要功能是为按钮交互提供可选的音效反馈。它在系统中扮演UI交互增强的角色，通过在用户点击或悬停按钮时播放预设音效来提升用户体验。该类的主要特性包括：
+
+- **音效反馈**：支持在按钮点击（Pressed）和悬停（Rollover）时播放自定义音效
+- **状态管理**：通过`pointerWasUp`标志优化音效触发逻辑，避免重复播放
+- **继承与扩展**：继承自Unity的Button组件，保留原有功能的同时增加音效功能
+
+### 2. 核心类解析
+
+#### `CleanButton`类
+
+- **职责说明**：该类负责扩展Unity标准Button组件，增加音效播放功能。主要处理用户交互事件（点击、悬停等）并触发相应的音效播放。
+- **关键方法清单**：
+  - `public override void OnPointerClick(PointerEventData eventData)`
+  - `public override void OnPointerUp(PointerEventData eventData)`
+  - `public override void OnPointerEnter(PointerEventData eventData)`
+  - `public override void OnPointerExit(PointerEventData eventData)`
+  - `protected override void Awake()`
+- **继承关系**：
+  ```
+  CleanButton -> Button -> UIBehaviour
+  ```
+- **依赖模块**：
+  - `ButtonSounds`类：用于播放音效
+  - `UnityEngine.EventSystems`命名空间：提供PointerEventData等事件数据类型
+  - `UnityEngine.UI`命名空间：提供Button基类
+
+### 3. 关键方法详解
+
+#### `protected override void Awake()`
+- **方法签名**：`protected override void Awake()`
+- **功能描述**：初始化音效组件，通过`GetComponent<ButtonSounds>()`获取按钮音效实例。
+- **调用关系**：在MonoBehaviour生命周期中自动调用，频率为一次（组件初始化时）
+
+#### `public override void OnPointerClick(PointerEventData eventData)`
+- **方法签名**：`public override void OnPointerClick(PointerEventData eventData)`
+- **功能描述**：当用户点击按钮时触发，检查是否可交互且音效组件存在，若满足条件则播放点击音效。
+- **调用关系**：在用户点击按钮时由Unity事件系统调用，频率取决于用户交互频率
+
+#### `public override void OnPointerUp(PointerEventData eventData)`
+- **方法签名**：`public override void OnPointerUp(PointerEventData eventData)`
+- **功能描述**：当用户释放按钮时触发，设置`pointerWasUp`标志为`true`，表示指针已抬起。
+- **调用关系**：在用户释放按钮时由Unity事件系统调用，频率取决于用户交互频率
+
+#### `public override void OnPointerEnter(PointerEventData eventData)`
+- **方法签名**：`public override void OnPointerEnter(PointerEventData eventData)`
+- **功能描述**：当用户悬停在按钮上时触发。如果`pointerWasUp`为`true`，表示是新悬停事件，则播放悬停音效并重置标志。
+- **调用关系**：在用户悬停在按钮上时由Unity事件系统调用，频率取决于用户交互频率
+
+#### `public override void OnPointerExit(PointerEventData eventData)`
+- **方法签名**：`public override void OnPointerExit(PointerEventData eventData)`
+- **功能描述**：当用户移出按钮范围时触发，重置`pointerWasUp`标志为`false`。
+- **调用关系**：在用户移出按钮范围时由Unity事件系统调用，频率取决于用户交互频率
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class UIBehaviour {
+        #+System.Void Awake()
+        #+System.Void OnPointerClick(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerUp(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerEnter(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerExit(UnityEngine.EventSystems.PointerEventData)
+    }
+
+    class Button {
+        <UIBehaviour
+        #+System.Void Awake()
+        #+System.Void OnPointerClick(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerUp(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerEnter(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerExit(UnityEngine.EventSystems.PointerEventData)
+    }
+
+    class CleanButton {
+        <Button
+        #+System.Void Awake()
+        #+System.Void OnPointerClick(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerUp(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerEnter(UnityEngine.EventSystems.PointerEventData)
+        #+System.Void OnPointerExit(UnityEngine.EventSystems.PointerEventData)
+        #+UnityEngine.ButtonSounds buttonSounds
+        #+System.Boolean pointerWasUp
+    }
+
+    class ButtonSounds {
+        #+System.Void PlayPressedSound()
+        #+System.Void PlayRolloverSound()
+    }
+
+    CleanButton --> ButtonSounds : dependency
+    CleanButton --> Button : inheritance
+    Button --> UIBehaviour : inheritance
+```

@@ -1,0 +1,219 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using UnityEditor;
+using UnityEngine;
+/// <summary>
+/// 通过项目已用资源记录表，生成新CSV，方便添加到购物记录里。
+/// </summary>
+
+public class CsvMatcherEditor : EditorWindow
+{
+    private Object extractedResourcesFile;
+    private Object resourceIndexLibraryFile;
+    private string outputPath = "Assets/MatchedResources.csv";
+
+    [MenuItem("ZTResource/Tools/已用资源合并到购物记录", false, 8)]
+    public static void ShowWindow()
+    {
+        GetWindow<CsvMatcherEditor>("CSV Matcher");
+    }
+
+    private void OnGUI()
+    {
+        GUILayout.Label("CSV Matcher Settings", EditorStyles.boldLabel);
+
+        extractedResourcesFile = EditorGUILayout.ObjectField("Extracted Resources CSV", extractedResourcesFile, typeof(Object), false);
+        resourceIndexLibraryFile = EditorGUILayout.ObjectField("Resource Index Library CSV", resourceIndexLibraryFile, typeof(Object), false);
+        outputPath = EditorGUILayout.TextField("Output Path", outputPath);
+
+        if (GUILayout.Button("Match CSVs"))
+        {
+            MatchCSVs();
+        }
+    }
+
+    private void MatchCSVs()
+    {
+        if (extractedResourcesFile == null || resourceIndexLibraryFile == null)
+        {
+            Debug.LogError("请指定有效的CSV文件。");
+            return;
+        }
+
+        string extractedResourcesPath = AssetDatabase.GetAssetPath(extractedResourcesFile);
+        string resourceIndexLibraryPath = AssetDatabase.GetAssetPath(resourceIndexLibraryFile);
+
+        var extractedResources = ReadCsv(extractedResourcesPath);
+        var resourceIndexLibrary = ReadCsv(resourceIndexLibraryPath);
+
+        var matchedResources = new List<string[]>();
+
+        foreach (var extracted in extractedResources)
+        {
+            var matchingRow = resourceIndexLibrary.FirstOrDefault(ri => ri[0].Contains(extracted[0])); // 使用Contains进行部分匹配
+            if (matchingRow != null)
+            {
+                matchedResources.Add(matchingRow);
+            }
+        }
+
+        WriteCsv(outputPath, matchedResources);
+        Debug.Log("匹配完成，结果已保存至 " + outputPath);
+    }
+
+    private List<string[]> ReadCsv(string path)
+    {
+        var lines = File.ReadAllLines(path);
+        return lines.Select(line => line.Split(',')).ToList();
+    }
+
+    private void WriteCsv(string path, List<string[]> records)
+    {
+        var lines = records.Select(record => string.Join(",", record)).ToList();
+        File.WriteAllLines(path, lines, Encoding.UTF8);
+    }
+}
+#endif
+
+源代码内容解释如下：
+```markdown
+# 代码文件分析
+
+## 1. 功能概览
+
+- **功能总结**：该代码文件实现了一个Unity编辑器工具，用于将两个CSV文件进行匹配，生成一个新的CSV文件。主要目的是通过已用资源记录表，生成新CSV，方便添加到购物记录里。
+
+- **系统角色**：该工具作为Unity编辑器扩展，在资源管理和数据处理中起到重要作用，帮助开发者高效地整理和匹配资源数据。
+
+- **主要特性与技术实现**：
+  - **CSV文件处理**：能够读取和写入CSV文件。
+  - **数据匹配**：通过部分匹配（Contains）实现资源匹配。
+  - **GUI界面**：提供友好的用户界面，方便用户选择输入文件和输出路径。
+  - **依赖**：主要依赖Unity编辑器API和基本文件操作。
+
+---
+
+## 2. 核心类解析
+
+### CsvMatcherEditor
+
+- **职责说明**：该类是一个Unity编辑器窗口，用于提供一个图形用户界面，使用户能够选择输入的CSV文件和输出路径，并执行CSV文件的匹配操作。
+
+- **关键方法清单**：
+  - `public static void ShowWindow()`：显示编辑器窗口。
+  - `private void OnGUI()`：绘制用户界面。
+  - `private void MatchCSVs()`：执行CSV文件的匹配逻辑。
+  - `private List<string[]> ReadCsv(string path)`：读取CSV文件。
+  - `private void WriteCsv(string path, List<string[]> records)`：写入CSV文件。
+
+- **继承关系**：
+  ```
+  CsvMatcherEditor -> EditorWindow
+  ```
+
+- **依赖模块**：
+  - `UnityEngine.AssetDatabase`
+  - `UnityEngine.Debug`
+  - `System.IO.File`
+  - `System.Linq`
+
+---
+
+## 3. 关键方法详解
+
+### 1. `public static void ShowWindow()`
+
+- **方法签名**：`public static void ShowWindow()`
+
+- **功能描述**：这是一个静态方法，用于显示`CsvMatcherEditor`编辑器窗口。调用`GetWindow<CsvMatcherEditor>`创建并显示窗口。
+
+- **调用关系**：通过`MenuItem`属性绑定到Unity编辑器菜单，用户点击菜单项时调用。
+
+---
+
+### 2. `private void OnGUI()`
+
+- **方法签名**：`private void OnGUI()`
+
+- **功能描述**：这是Unity编辑器窗口的回调方法，负责绘制用户界面。界面包含三个部分：
+  - 选择提取资源CSV文件的字段。
+  - 选择资源索引库CSV文件的字段。
+  - 输出路径的文本框。
+  - 一个“Match CSVs”按钮，点击后调用`MatchCSVs()`方法。
+
+- **调用关系**：由Unity编辑器框架自动调用，每次窗口更新时执行。
+
+---
+
+### 3. `private void MatchCSVs()`
+
+- **方法签名**：`private void MatchCSVs()`
+
+- **功能描述**：执行CSV文件的匹配逻辑。主要步骤如下：
+  1. 检查输入文件是否有效。
+  2. 读取两个CSV文件的内容。
+  3. 对每个提取的资源进行匹配，匹配规则是资源索引库中资源ID包含提取资源的资源ID。
+  4. 将匹配结果写入新的CSV文件。
+
+- **算法说明**：使用LINQ的`FirstOrDefault`方法进行部分匹配，匹配规则是资源索引库中资源ID包含提取资源的资源ID。
+
+- **调用关系**：由`OnGUI()`方法中的按钮点击事件调用，调用频率取决于用户的操作。
+
+---
+
+### 4. `private List<string[]> ReadCsv(string path)`
+
+- **方法签名**：`private List<string[]> ReadCsv(string path)`
+
+- **功能描述**：读取指定路径的CSV文件，返回一个包含CSV行数据的列表。每行数据被拆分为字符串数组。
+
+- **算法说明**：使用`File.ReadAllLines`读取所有行，然后使用`Split(',')`将每行数据拆分为字符串数组。
+
+- **调用关系**：由`MatchCSVs()`方法调用，用于读取提取资源CSV和资源索引库CSV。
+
+---
+
+### 5. `private void WriteCsv(string path, List<string[]> records)`
+
+- **方法签名**：`private void WriteCsv(string path, List<string[]> records)`
+
+- **功能描述**：将指定的记录列表写入指定路径的CSV文件。每行记录被转换为CSV格式的字符串。
+
+- **算法说明**：使用`string.Join(",", record)`将每行记录转换为CSV格式的字符串，然后使用`File.WriteAllLines`写入文件。
+
+- **调用关系**：由`MatchCSVs()`方法调用，用于将匹配结果写入新的CSV文件。
+
+---
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+
+  class CsvMatcherEditor {
+    +void ShowWindow()
+    +void OnGUI()
+    +void MatchCSVs()
+    +List<string[]> ReadCsv(string)
+    +void WriteCsv(string, List<string[]>)
+    +static void ShowWindow()
+  }
+
+  CsvMatcherEditor --> EditorWindow
+  CsvMatcherEditor --> AssetDatabase
+  CsvMatcherEditor --> File
+  CsvMatcherEditor --> Debug
+```
+
+- **继承层次结构**：`CsvMatcherEditor`继承自`EditorWindow`。
+- **组合/聚合关系**：无。
+- **重要依赖关系**：
+  - `AssetDatabase`：用于获取资产路径。
+  - `File`：用于读取和写入CSV文件。
+  - `Debug`：用于日志输出。
+- **接口实现情况**：无。

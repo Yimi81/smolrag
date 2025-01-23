@@ -1,0 +1,314 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO;
+using System.Globalization;
+using System.Linq;
+
+// 负责从CSV文件加载用户购买数据，并在游戏开始时初始化用户信息。
+public class UserPurchaseManager : MonoBehaviour
+{
+    private List<UserPurchaseData> allUserPurchases = new List<UserPurchaseData>();
+
+    void Awake()
+    {
+        LoadUserPurchaseData();
+    }
+
+    void Start()
+    {
+        PrintAllUserPurchases();
+    }
+
+    private void LoadUserPurchaseData()
+    {
+        string path = "Assets/ZTResource/UserInfo/UserPurchaseRecordLibrary.csv";
+        Debug.Log($"Loading data from: {path}");
+        if (!File.Exists(path))
+        {
+            Debug.LogError($"File not found: {path}");
+            return;
+        }
+
+        string[] lines = File.ReadAllLines(path, System.Text.Encoding.UTF8);
+        Debug.Log($"Total lines read: {lines.Length}");
+        bool isFirstLine = true; // 增加一个变量来跟踪是否是第一行
+        bool isNewBatch = false;
+        string currentBatchName = "";
+
+        foreach (string line in lines)
+        {
+            Debug.Log($"Processing line: {line}");
+
+            if (isFirstLine || line.StartsWith("资源ID"))
+            {
+                isFirstLine = false; // 如果是第一行或标题行，就将其标记为false，并继续下一行
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(line)) continue; // 跳过空行
+
+            if (line.StartsWith("批次名"))
+            {
+                currentBatchName = line.Split(',')[0];
+                isNewBatch = true;
+                Debug.Log($"New batch found: {currentBatchName}");
+                continue;
+            }
+
+            string[] fields = line.Split(',');
+
+            if (isNewBatch)
+            {
+                isNewBatch = false;
+                continue;
+            }
+
+            // 检查字段数量是否足够
+            if (fields.Length < 18)
+            {
+                Debug.LogWarning($"Line skipped due to insufficient fields: {line}");
+                continue;
+            }
+
+            try
+            {
+                var userId = fields[0].Trim('"');
+                var resourceId = fields[1].Trim('"');
+                var userName = fields[2].Trim('"');
+                var resourceName = fields[3].Trim('"');
+                var resourceDescription = fields[4].Trim('"');
+                var resourceHeight = fields[5].Trim('"');              
+                var prefabPath = fields[6].Trim('"');
+                var thumbnailPath = fields[7].Trim('"');
+                var modelFaces = fields[8].Trim('"');
+                var creationDate = fields[9].Trim('"');
+                var updatedDate = fields[10].Trim('"');
+                var version = fields[11].Trim('"');
+                var typeTags = new List<string>(fields[12].Trim('"').Split(';').Select(tag => tag.Trim()));
+                var themeTags = new List<string>(fields[13].Trim('"').Split(';').Select(tag => tag.Trim()));
+                var functionTags = new List<string>(fields[14].Trim('"').Split(';').Select(tag => tag.Trim()));
+                var definitionTags = new List<string>(fields[15].Trim('"').Split(';').Select(tag => tag.Trim()));
+                var batchTags = new List<string>(fields[16].Trim('"').Split(';').Select(tag => tag.Trim()));
+                var propertyTags = new List<string>(fields[17].Trim('"').Split(';').Select(tag => tag.Trim()));
+
+                UserPurchaseData data = new UserPurchaseData(userId, resourceId, userName, resourceName, resourceDescription, resourceHeight, typeTags, themeTags, functionTags, definitionTags, batchTags, propertyTags, prefabPath, thumbnailPath, modelFaces, creationDate, updatedDate, version);
+                allUserPurchases.Add(data);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error processing line: {line}\nException: {ex.Message}");
+            }
+        }
+
+        Debug.Log($"Total purchases loaded: {allUserPurchases.Count}");
+    }
+
+    public List<UserPurchaseData> GetAllUserPurchases()
+    {
+        return allUserPurchases;
+    }
+
+    private void PrintAllUserPurchases()
+    {
+        Debug.Log("Printing all user purchases...");
+        foreach (var purchase in allUserPurchases)
+        {
+            Debug.Log($"Name: {purchase.ResourceName}, Description: {purchase.ResourceDescription}, Height: {purchase.ResourceHeight}, " +
+                      $"Type Tags: {string.Join(", ", purchase.TypeTags)}, Theme Tags: {string.Join(", ", purchase.ThemeTags)}, " +
+                      $"Function Tags: {string.Join(", ", purchase.FunctionTags)}, Definition Tags: {string.Join(", ", purchase.DefinitionTags)}, " +
+                      $"Batch Tags: {string.Join(", ", purchase.BatchTags)}, Property Tags: {string.Join(", ", purchase.PropertyTags)}, " +
+                      $"Prefab Path: {purchase.PrefabPath}, Thumbnail Path: {purchase.ThumbnailPath}, Model Faces: {purchase.ModelFaces}, " +
+                      $"Creation Date: {purchase.CreationDate}, Updated Date: {purchase.UpdatedDate}, Version: {purchase.Version}, ID: {purchase.ResourceID}, User: {purchase.UserName}");
+        }
+    }
+}
+
+public class UserPurchaseData
+{
+    public string UserID { get; private set; }
+    public string ResourceID { get; private set; }
+    public string UserName { get; private set; }
+    public string ResourceName { get; private set; }
+    public string ResourceDescription { get; private set; }
+    public string ResourceHeight { get; private set; }
+    public List<string> TypeTags { get; private set; }
+    public List<string> ThemeTags { get; private set; }
+    public List<string> FunctionTags { get; private set; }
+    public List<string> DefinitionTags { get; private set; }
+    public List<string> BatchTags { get; private set; }
+    public List<string> PropertyTags { get; private set; }
+    public string PrefabPath { get; private set; }
+    public string ThumbnailPath { get; private set; }
+    public string ModelFaces { get; private set; }
+    public string CreationDate { get; private set; }
+    public string UpdatedDate { get; private set; }
+    public string Version { get; private set; }
+
+    public UserPurchaseData(string userId, string resourceId, string userName, string resourceName, string resourceDescription, string resourceHeight,
+                            List<string> typeTags, List<string> themeTags, List<string> functionTags, List<string> definitionTags, List<string> batchTags,
+                            List<string> propertyTags, string prefabPath, string thumbnailPath, string modelFaces, string creationDate, string updatedDate, string version)
+    {
+        UserID = userId;
+        ResourceID = resourceId;
+        UserName = userName;
+        ResourceName = resourceName;
+        ResourceDescription = resourceDescription;
+        ResourceHeight = resourceHeight;
+        TypeTags = typeTags;
+        ThemeTags = themeTags;
+        FunctionTags = functionTags;
+        DefinitionTags = definitionTags;
+        BatchTags = batchTags;
+        PropertyTags = propertyTags;
+        PrefabPath = prefabPath;
+        ThumbnailPath = thumbnailPath;
+        ModelFaces = modelFaces;
+        CreationDate = creationDate;
+        UpdatedDate = updatedDate;
+        Version = version;
+    }
+}
+#endif
+源代码内容解释如下：
+```markdown
+# 代码文件分析
+
+## 1. 功能概览
+
+### 功能定位
+该代码文件实现了从CSV文件加载用户购买数据的功能，并在游戏启动时初始化用户信息。它主要负责读取CSV文件，解析数据，并将其存储为可访问的数据结构。
+
+### 系统角色
+在Unity项目中，该脚本作为用户购买数据管理器，起到数据加载和初始化的作用。它确保游戏在启动时能够获取到用户购买记录，为后续功能提供数据支持。
+
+### 主要特性与技术实现
+- **CSV文件读取与解析**：使用C#的File类读取CSV文件，并逐行解析数据。
+- **数据存储**：将解析后的数据存储在List<UserPurchaseData>中，便于后续访问。
+- **错误处理**：处理文件不存在、字段不足等情况，并提供调试日志。
+- **数据输出**：在启动时打印所有用户购买数据，便于调试和确认数据加载结果。
+
+## 2. 核心类解析
+
+### UserPurchaseManager
+
+#### 职责说明
+该类负责从CSV文件加载用户购买数据，并在游戏启动时初始化这些数据。它处理文件读取、数据解析、存储和输出。
+
+#### 关键方法清单
+- `void Awake()`：在脚本初始化时调用，触发数据加载。
+- `void Start()`：在脚本启动时调用，打印所有用户购买数据。
+- `private void LoadUserPurchaseData()`：读取并解析CSV文件，加载用户购买数据。
+- `public List<UserPurchaseData> GetAllUserPurchases()`：返回所有用户购买数据。
+- `private void PrintAllUserPurchases()`：打印所有用户购买数据。
+
+#### 继承关系
+```mermaid
+classDiagram
+    class MonoBehavior
+    class UserPurchaseManager {
+        +void Awake()
+        +void Start()
+        +void LoadUserPurchaseData()
+        +List<UserPurchaseData> GetAllUserPurchases()
+        +void PrintAllUserPurchases()
+    }
+    UserPurchaseManager --> MonoBehavior
+```
+
+#### 依赖模块
+- System.Collections.Generic (List<T>)
+- UnityEngine (MonoBehaviour, Debug, GameObject)
+- System.IO (File)
+- System.Linq (LINQ方法)
+- System.Globalization (文化信息)
+
+### UserPurchaseData
+
+#### 职责说明
+该类作为数据容器，存储用户购买数据的各个字段，如用户ID、资源ID、用户名、资源名称、描述、高度、标签信息等。
+
+#### 关键方法清单
+- `public UserPurchaseData(string userId, string resourceId, string userName, string resourceName, string resourceDescription, string resourceHeight, List<string> typeTags, List<string> themeTags, List<string> functionTags, List<string> definitionTags, List<string> batchTags, List<string> propertyTags, string prefabPath, string thumbnailPath, string modelFaces, string creationDate, string updatedDate, string version)`：构造函数，初始化所有字段。
+
+#### 继承关系
+```mermaid
+classDiagram
+    class UserPurchaseData
+```
+
+## 3. 关键方法详解
+
+### LoadUserPurchaseData
+
+#### 方法签名
+```csharp
+private void LoadUserPurchaseData()
+```
+
+#### 功能描述
+该方法从指定路径的CSV文件中读取用户购买数据，解析每一行数据，并将其存储在`allUserPurchases`列表中。
+
+#### 处理逻辑
+1. **文件路径检查**：检查CSV文件是否存在，若不存在则输出错误日志并返回。
+2. **读取文件内容**：使用`File.ReadAllLines`读取文件内容。
+3. **逐行解析**：
+   - 跳过标题行和空行。
+   - 处理批次名，更新当前批次名称。
+   - 解析每行数据，将字段分割并处理。
+   - 检查字段数量是否足够，不足则跳过该行。
+   - 创建`UserPurchaseData`对象，并添加到`allUserPurchases`列表中。
+4. **异常处理**：捕获解析过程中的异常，输出错误信息。
+
+### PrintAllUserPurchases
+
+#### 方法签名
+```csharp
+private void PrintAllUserPurchases()
+```
+
+#### 功能描述
+该方法遍历`allUserPurchases`列表，打印每个用户的购买数据到调试控制台。
+
+#### 处理逻辑
+- 遍历`allUserPurchases`列表。
+- 对于每个`UserPurchaseData`对象，输出其所有字段信息。
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+    class MonoBehavior
+    class UserPurchaseManager {
+        +void Awake()
+        +void Start()
+        +void LoadUserPurchaseData()
+        +List<UserPurchaseData> GetAllUserPurchases()
+        +void PrintAllUserPurchases()
+    }
+    class UserPurchaseData {
+        +string UserID
+        +string ResourceID
+        +string UserName
+        +string ResourceName
+        +string ResourceDescription
+        +string ResourceHeight
+        +List<string> TypeTags
+        +List<string> ThemeTags
+        +List<string> FunctionTags
+        +List<string> DefinitionTags
+        +List<string> BatchTags
+        +List<string> PropertyTags
+        +string PrefabPath
+        +string ThumbnailPath
+        +string ModelFaces
+        +string CreationDate
+        +string UpdatedDate
+        +string Version
+        +UserPurchaseData(string userId, string resourceId, string userName, string resourceName, string resourceDescription, string resourceHeight, List<string> typeTags, List<string> themeTags, List<string> functionTags, List<string> definitionTags, List<string> batchTags, List<string> propertyTags, string prefabPath, string thumbnailPath, string modelFaces, string creationDate, string updatedDate, string version)
+    }
+    UserPurchaseManager --> MonoBehavior
+    UserPurchaseManager --> UserPurchaseData
+```
+
+该架构图展示了类之间的继承关系和依赖关系。`UserPurchaseManager`继承自`MonoBehavior`，并依赖于`UserPurchaseData`类来存储用户购买数据。

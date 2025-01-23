@@ -1,0 +1,194 @@
+文件源代码内容如下：
+﻿// Copyright (C) 2015-2021 gamevanilla - All rights reserved.
+// This code can only be used under the standard Unity Asset Store End User License Agreement.
+// A Copy of the Asset Store EULA is available at http://unity3d.com/company/legal/as_terms.
+
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace UltimateClean
+{
+    /// <summary>
+    /// The gradient effect used throughout the kit. This code is heavily inspired
+	/// by https://github.com/azixMcAze/Unity-UIGradient. All credit goes to them!
+    /// </summary>
+	[AddComponentMenu("UI/Effects/Gradient")]
+	public class Gradient : BaseMeshEffect
+	{
+		public Color Color1 = Color.white;
+		public Color Color2 = Color.white;
+
+		[Range(-180f, 180f)] public float Angle = -90.0f;
+
+		public override void ModifyMesh(VertexHelper vh)
+		{
+			if (enabled)
+			{
+				var rect = graphic.rectTransform.rect;
+				var dir = RotationDir(Angle);
+
+				var localPositionMatrix = LocalPositionMatrix(rect, dir);
+
+				var vertex = default(UIVertex);
+				for (var i = 0; i < vh.currentVertCount; i++)
+				{
+					vh.PopulateUIVertex(ref vertex, i);
+					var localPosition = localPositionMatrix * vertex.position;
+					vertex.color *= Color.Lerp(Color2, Color1, localPosition.y);
+					vh.SetUIVertex(vertex, i);
+				}
+			}
+		}
+
+		public struct Matrix2x3
+		{
+			public float m00, m01, m02, m10, m11, m12;
+
+			public Matrix2x3(float m00, float m01, float m02, float m10, float m11, float m12)
+			{
+				this.m00 = m00;
+				this.m01 = m01;
+				this.m02 = m02;
+				this.m10 = m10;
+				this.m11 = m11;
+				this.m12 = m12;
+			}
+
+			public static Vector2 operator *(Matrix2x3 m, Vector2 v)
+			{
+				float x = (m.m00 * v.x) - (m.m01 * v.y) + m.m02;
+				float y = (m.m10 * v.x) + (m.m11 * v.y) + m.m12;
+				return new Vector2(x, y);
+			}
+		}
+
+		private Matrix2x3 LocalPositionMatrix(Rect rect, Vector2 dir)
+		{
+			float cos = dir.x;
+			float sin = dir.y;
+			Vector2 rectMin = rect.min;
+			Vector2 rectSize = rect.size;
+			float c = 0.5f;
+			float ax = rectMin.x / rectSize.x + c;
+			float ay = rectMin.y / rectSize.y + c;
+			float m00 = cos / rectSize.x;
+			float m01 = sin / rectSize.y;
+			float m02 = -(ax * cos - ay * sin - c);
+			float m10 = sin / rectSize.x;
+			float m11 = cos / rectSize.y;
+			float m12 = -(ax * sin + ay * cos - c);
+			return new Matrix2x3(m00, m01, m02, m10, m11, m12);
+		}
+
+		private Vector2 RotationDir(float angle)
+		{
+			float angleRad = angle * Mathf.Deg2Rad;
+			float cos = Mathf.Cos(angleRad);
+			float sin = Mathf.Sin(angleRad);
+			return new Vector2(cos, sin);
+		}
+	}
+}
+
+源代码内容解释如下：
+### 1. 功能概览
+
+#### 功能定位
+该代码文件实现了一个用于Unity UI组件的渐变效果。它允许用户在UI元素上创建从一个颜色到另一个颜色的线性渐变，并支持通过角度参数调整渐变的方向。该效果通过修改UI顶点的颜色值来实现。
+
+#### 系统角色
+该类继承自`BaseMeshEffect`，在Unity UI系统中用于对UI元素的顶点数据进行自定义修改。它是视觉效果系统中的一个重要组成部分，能够为UI元素提供丰富的视觉表现。
+
+#### 主要特性与技术实现
+- 支持线性渐变效果，可调整起始颜色和结束颜色
+- 支持通过角度参数调整渐变方向
+- 使用矩阵变换计算顶点位置
+- 使用颜色插值算法实现平滑过渡
+- 核心算法基于向量和矩阵运算
+
+### 2. 核心类解析
+
+#### `Gradient`类
+
+**职责说明**  
+该类主要用于实现UI元素的渐变效果，通过重写基类的方法来修改顶点颜色数据，实现从一个颜色到另一个颜色的平滑过渡。
+
+**关键方法清单**  
+- `public override void ModifyMesh(VertexHelper vh)`：重写基类方法，实现渐变效果的核心逻辑
+- `private Vector2 RotationDir(float angle)`：计算旋转方向的向量
+- `private Matrix2x3 LocalPositionMatrix(Rect rect, Vector2 dir)`：计算局部位置变换矩阵
+
+**继承关系**  
+```
+Gradient -> BaseMeshEffect -> MonoBehaviour
+```
+
+**依赖模块**  
+- `UnityEngine.UI`命名空间中的`VertexHelper`和`UIVertex`类
+- `UnityEngine`命名空间中的`Mathf`类和`Vector2`类
+
+### 3. 关键方法详解
+
+#### `ModifyMesh`方法
+
+**方法签名**  
+```csharp
+public override void ModifyMesh(VertexHelper vh)
+```
+
+**功能描述**  
+该方法是`BaseMeshEffect`的核心接口，用于修改UI元素的顶点数据。具体实现如下：
+1. 获取UI元素的矩形区域
+2. 计算渐变方向向量
+3. 生成局部位置变换矩阵
+4. 遍历所有顶点，计算每个顶点的位置，并根据该位置在渐变方向上的位置插值颜色值
+
+**算法说明**  
+1. 使用`RotationDir`方法计算渐变方向的单位向量
+2. 使用`LocalPositionMatrix`方法生成变换矩阵，用于将顶点位置转换到渐变空间中
+3. 对每个顶点，计算其在渐变空间中的位置，然后使用`Color.Lerp`方法根据该位置在渐变方向上的比例值插值颜色值
+
+**调用关系**  
+该方法由Unity UI系统调用，具体调用频率取决于UI系统的刷新频率和性能设置
+
+#### `RotationDir`方法
+
+**方法签名**  
+```csharp
+private Vector2 RotationDir(float angle)
+```
+
+**功能描述**  
+该方法将给定的角度转换为一个二维向量，用于表示渐变方向的方向向量
+
+**算法说明**  
+使用三角函数将角度转换为向量：
+- x分量为`cos(angle)`
+- y分量为`sin(angle)`
+
+#### `LocalPositionMatrix`方法
+
+**方法签名**  
+```csharp
+private Matrix2x3 LocalPositionMatrix(Rect rect, Vector2 dir)
+```
+
+**功能描述**  
+该方法生成一个2x3的变换矩阵，用于将顶点位置转换到渐变空间中
+
+**算法说明**  
+该矩阵用于将顶点的局部位置坐标转换为归一化后的坐标，以便后续进行颜色插值。具体计算如下：
+- 计算矩形的最小值和大小
+- 计算归一化因子
+- 构建变换矩阵，包含旋转、缩放和平移操作
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    BaseMeshEffect --> Gradient
+    Gradient --> MonoBehaviour
+    Matrix2x3 --> Gradient
+    Note left of BaseMeshEffect: 基类 - 提供Mesh效果基架
+    Note left of Matrix2x3: 嵌套结构 - 用于2D空间变换
+```

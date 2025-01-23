@@ -1,0 +1,343 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.IO;
+using System.Text;
+using UnityEngine.SceneManagement; // 引入SceneManager类
+using UnityEditor;
+
+/// <summary>
+/// 用户信息记录器，用于处理用户注册、文件选择和场景切换等功能
+/// </summary>
+public class UserInfoRecorder : MonoBehaviour
+{
+    public TMP_InputField usernameInputField; // 用户名输入框 (TextMeshPro)
+    public Image avatarImage; // 头像图片
+    public Button createButton; // 创建按钮
+    public Button selectFileButton; // 选择文件按钮
+    public Button openSceneButton; // 打开道具场景按钮
+    public Button openCharacterEditorButton; // 打开CharacterEditor场景按钮
+
+    public GameObject registrationPanel; // 注册页Panel
+    public GameObject selectionPanel; // 选择页Panel
+    public TMP_Text selectionUsernameText; // 选择页中的用户名文本
+    public Image selectionAvatarImage; // 选择页中的头像图片
+
+    public Button deletePrefsButton; // 删除PlayerPrefs按钮
+
+    void Start()
+    {
+        // 给创建按钮添加点击事件监听
+        createButton.onClick.AddListener(SaveUserInfo);
+        // 给选择文件按钮添加点击事件监听
+        selectFileButton.onClick.AddListener(OpenFileSelectionDialog);
+        // 给删除PlayerPrefs按钮添加点击事件监听
+        deletePrefsButton.onClick.AddListener(DeletePlayerPrefs);
+        // 给打开道具场景按钮添加点击事件监听
+        openSceneButton.onClick.AddListener(OpenScene);
+        // 给打开CharacterEditor场景按钮添加点击事件监听
+        openCharacterEditorButton.onClick.AddListener(OpenCharacterEditorScene);
+
+        // 检查PlayerPrefs是否有保存的用户信息
+        string userKey = PlayerPrefs.GetString("currentUserKey", string.Empty);
+        if (!string.IsNullOrEmpty(userKey))
+        {
+            LoadUserInfo(userKey);
+            SwitchToSceneSelectionPanel();
+        }
+        else
+        {
+            // 如果PlayerPrefs为空，显示注册页面
+            registrationPanel.SetActive(true);
+            selectionPanel.SetActive(false);
+        }
+    }
+
+    void DeletePlayerPrefs()
+    {
+        PlayerPrefs.DeleteKey("currentUserKey");
+        PlayerPrefs.Save();
+        Debug.Log("PlayerPrefs data deleted.");
+
+        // 重新加载当前场景
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    void SaveUserInfo()
+    {
+        string username = usernameInputField.text;
+        string avatarName = avatarImage.sprite.name + ".png"; // 添加文件后缀名
+
+        // 生成唯一标识符 (用户名 + PurchaseRecordLibrary)
+        string userKey = username + "PurchaseRecordLibrary";
+
+        // 将用户名 + PurchaseRecordLibrary 保存到 PlayerPrefs 中
+        PlayerPrefs.SetString("currentUserKey", userKey);
+        PlayerPrefs.Save();
+
+        // 创建CSV文件名
+        string fileName = userKey + ".csv";
+        StringBuilder csvContent = new StringBuilder();
+        csvContent.AppendLine("用户,头像");
+        csvContent.AppendLine($"{username},{avatarName}");
+
+        // 保存路径
+        string folderPath = Path.Combine(Application.dataPath, "ZTResource/UserInfo");
+        if (!Directory.Exists(folderPath))
+        {
+            Directory.CreateDirectory(folderPath);
+        }
+
+        string filePath = Path.Combine(folderPath, fileName);
+        File.WriteAllText(filePath, csvContent.ToString(), Encoding.UTF8);
+
+        Debug.Log("User information saved to: " + filePath);
+
+        // 刷新项目窗口
+        AssetDatabase.Refresh();
+
+        // 切换到选择页Panel
+        LoadUserInfo(userKey);
+        SwitchToSceneSelectionPanel();
+    }
+
+    void OpenFileSelectionDialog()
+    {
+        string folderPath = Path.Combine(Application.dataPath, "ZTResource/UserInfo");
+        string filePath = EditorUtility.OpenFilePanel("Select User CSV", folderPath, "csv");
+
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            // 从文件名中提取用户名并保存到 PlayerPrefs
+            string fileName = Path.GetFileNameWithoutExtension(filePath);
+            PlayerPrefs.SetString("currentUserKey", fileName);
+            PlayerPrefs.Save();
+
+            Debug.Log("User information loaded from: " + filePath);
+
+            // 切换到选择页Panel
+            LoadUserInfo(fileName);
+            SwitchToSceneSelectionPanel();
+        }
+    }
+
+    void LoadUserInfo(string userKey)
+    {
+        string folderPath = Path.Combine(Application.dataPath, "ZTResource/UserInfo");
+        string fileName = userKey + ".csv";
+        string filePath = Path.Combine(folderPath, fileName);
+
+        if (!File.Exists(filePath))
+        {
+            Debug.LogError("User CSV file not found: " + filePath);
+            return;
+        }
+
+        string[] lines = File.ReadAllLines(filePath);
+        if (lines.Length > 1)
+        {
+            string[] data = lines[1].Split(',');
+            string username = data[0];
+            string avatarName = data[1];
+
+            selectionUsernameText.text = username;
+
+            // 加载头像图片
+            string avatarPath = Path.Combine(Application.dataPath, "ZTResource/Resources/ZT_Sprites/ZT_User_Icon", Path.GetFileNameWithoutExtension(avatarName) + ".png");
+            if (File.Exists(avatarPath))
+            {
+                byte[] fileData = File.ReadAllBytes(avatarPath);
+                Texture2D texture = new Texture2D(2, 2);
+                texture.LoadImage(fileData);
+                Sprite avatarSprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+                selectionAvatarImage.sprite = avatarSprite;
+            }
+            else
+            {
+                Debug.LogError("Avatar sprite not found at path: " + avatarPath);
+            }
+        }
+        else
+        {
+            Debug.LogError("CSV file format is incorrect or empty.");
+        }
+    }
+
+    void SwitchToSceneSelectionPanel()
+    {
+        // 隐藏注册页Panel，显示选择页Panel
+        registrationPanel.SetActive(false);
+        selectionPanel.SetActive(true);
+    }
+
+    void OpenScene()
+    {
+        SceneManager.LoadScene("Assets/ZTResource/ZTResource.unity");
+    }
+
+    void OpenCharacterEditorScene()
+    {
+        SceneManager.LoadScene("CharacterEditor");
+    }
+}
+#endif
+
+源代码内容解释如下：
+### 功能概览
+
+#### 总结
+`UserInfoRecorder` 是一个用于管理用户信息的脚本，主要功能包括用户注册、用户信息的保存与加载、场景切换以及界面管理。它在 Unity 项目中扮演用户数据管理的核心角色，支持用户创建账户、选择头像、加载用户数据以及在不同场景之间切换。
+
+#### 角色与重要性
+该脚本在用户管理模块中至关重要，负责用户数据的持久化存储（使用 `PlayerPrefs` 和 CSV 文件），并管理用户界面的显示与隐藏。通过该脚本，用户能够创建新账户、选择已有账户以及在不同场景之间导航。它还提供了删除用户数据的功能，增强了系统的灵活性和安全性。
+
+#### 主要特性与技术实现
+- **用户注册与保存**：通过 `SaveUserInfo` 方法，将用户名和头像信息保存到 CSV 文件，并记录当前用户标识到 `PlayerPrefs`。
+- **文件选择与加载**：利用 `OpenFileSelectionDialog` 方法，允许用户选择 CSV 文件并加载相应的用户数据。
+- **场景切换**：通过 `SceneManager` 实现不同场景之间的切换，包括道具场景和角色编辑器场景。
+- **界面管理**：动态显示和隐藏注册界面和选择界面，提升用户体验。
+- **用户数据删除**：通过 `DeletePlayerPrefs` 方法清除用户数据并重载场景，提供数据清除功能。
+
+### 核心类解析
+
+#### `UserInfoRecorder`
+- **职责说明**：该类负责用户信息的记录、加载、保存以及界面和场景的切换操作。它管理用户与应用程序之间的交互，确保用户数据的正确存储和加载。
+- **关键方法清单**：
+  - `void Start()`
+  - `void DeletePlayerPrefs()`
+  - `void SaveUserInfo()`
+  - `void OpenFileSelectionDialog()`
+  - `void LoadUserInfo(string userKey)`
+  - `void SwitchToSceneSelectionPanel()`
+  - `void OpenScene()`
+  - `void OpenCharacterEditorScene()`
+- **继承关系**：`UserInfoRecorder -> MonoBehaviour`
+- **依赖模块**：
+  - `UnityEngine.SceneManagement.SceneManager`
+  - `UnityEngine.PlayerPrefs`
+  - ` UnityEditor.EditorUtility`
+  - ` UnityEditor.AssetDatabase`
+  - `System.IO.File`、`System.IO.Directory`
+  - `UnityEngine.UI.Image`、`UnityEngine.UI.Button`、` UnityEngine.UI.TMP_InputField`、`UnityEngine.UI.TMP_Text`
+
+### 关键方法详解
+
+#### `void Start()`
+- **方法签名**：`void Start()`
+- **功能描述**：初始化按钮点击事件监听，检查 `PlayerPrefs` 中是否存在用户数据。如果存在，则加载用户数据并显示选择界面；否则，显示注册界面。
+- **算法说明**：使用 Unity 的 `MonoBehaviour` 生命周期函数，在脚本初始化时完成按钮事件绑定和用户数据检查。
+- **调用关系**：在脚本初始化时自动调用，调用 `SaveUserInfo`、`OpenFileSelectionDialog`、`DeletePlayerPrefs` 等方法。
+
+#### `void SaveUserInfo()`
+- **方法签名**：`void SaveUserInfo()`
+- **功能描述**：从输入框获取用户名和头像信息，生成唯一用户标识符，保存 CSV 文件并更新 `PlayerPrefs`。
+- **算法说明**：
+  1. 从输入框获取用户名和头像信息。
+  2. 生成唯一用户标识符 `userKey`。
+  3. 将 `userKey` 保存到 `PlayerPrefs`。
+  4. 创建 CSV 文件并写入用户数据。
+  5. 更新 UI 界面，显示选择界面。
+- **调用关系**：由 `createButton` 的点击事件触发，调用 `File.WriteAllText` 和 ` SceneManager.LoadScene`。
+
+#### `void OpenFileSelectionDialog()`
+- **方法签名**：`void OpenFileSelectionDialog()`
+- **功能描述**：打开文件选择对话框，允许用户选择 CSV 文件，加载用户数据并显示选择界面。
+- **算法说明**：
+  1. 打开文件选择对话框，获取用户选择的 CSV 文件路径。
+  2. 从文件名中提取用户名，并保存到 `PlayerPrefs`。
+  3. 加载用户数据并更新 UI 界面。
+- **调用关系**：由 `selectFileButton` 的点击事件触发，调用 `EditorUtility.OpenFilePanel` 和 `LoadUserInfo`。
+
+#### `void LoadUserInfo(string userKey)`
+- **方法签名**：`void LoadUserInfo(string userKey)`
+- **功能描述**：根据用户标识符加载 CSV 文件中的用户数据，更新 UI 界面。
+- **算法说明**：
+  1. 检查 CSV 文件是否存在，读取用户数据。
+  2. 更新用户名和头像信息。
+  3. 加载头像图片并显示。
+- **调用关系**：由 `SaveUserInfo` 和 `OpenFileSelectionDialog` 方法调用，调用 `File.ReadAllLines` 和 ` Texture2D.LoadImage`。
+
+#### `void SwitchToSceneSelectionPanel()`
+- **方法签名**：`void SwitchToSceneSelectionPanel()`
+- **功能描述**：隐藏注册界面，显示选择界面。
+- **算法说明**：通过设置游戏对象的 `active` 属性来控制界面的显示与隐藏。
+- **调用关系**：由 `SaveUserInfo`、`OpenFileSelectionDialog` 和 `DeletePlayerPrefs` 方法调用。
+
+#### `void OpenScene()`
+- **方法签名**：`void OpenScene()`
+- **功能描述**：加载道具场景。
+- **算法说明**：使用 `SceneManager.LoadScene` 加载指定场景。
+- **调用关系**：由 `openSceneButton` 的点击事件触发。
+
+#### `void OpenCharacterEditorScene()`
+- **方法签名**：`void OpenCharacterEditorScene()`
+- **功能描述**：加载角色编辑器场景。
+- **算法说明**：使用 `SceneManager.LoadScene` 加载指定场景。
+- **调用关系**：由 `openCharacterEditorButton` 的点击事件触发。
+
+#### `void DeletePlayerPrefs()`
+- **方法签名**：`void DeletePlayerPrefs()`
+- **功能描述**：删除 `PlayerPrefs` 中的用户数据，并重载当前场景。
+- **算法说明**：清除 `PlayerPrefs` 中的用户标识符，保存更改并重载场景。
+- **调用关系**：由 `deletePrefsButton` 的点击事件触发，调用 `SceneManager.LoadScene`。
+
+### 架构关系图
+
+```mermaid
+classDiagram
+    class UserInfoRecorder {
+        +void Start()
+        +void DeletePlayerPrefs()
+        +void SaveUserInfo()
+        +void OpenFileSelectionDialog()
+        +void LoadUserInfo(string userKey)
+        +void SwitchToSceneSelectionPanel()
+        +void OpenScene()
+        +void OpenCharacterEditorScene()
+    }
+    class MonoBehaviour {
+    }
+    class SceneManager {
+    }
+    class PlayerPrefs {
+    }
+    class EditorUtility {
+    }
+    class AssetDatabase {
+    }
+    class File {
+    }
+    class Directory {
+    }
+    class TMP_InputField {
+    }
+    class Image {
+    }
+    class Button {
+    }
+    class TMP_Text {
+    }
+    class GameObject {
+    }
+    class Sprite {
+    }
+    class Texture2D {
+    }
+    
+    UserInfoRecorder --> MonoBehaviour : extends
+    UserInfoRecorder --> SceneManager : uses
+    UserInfoRecorder --> PlayerPrefs : uses
+    UserInfoRecorder --> EditorUtility : uses
+    UserInfoRecorder --> AssetDatabase : uses
+    UserInfoRecorder --> File : uses
+    UserInfoRecorder --> Directory : uses
+    UserInfoRecorder --> TMP_InputField : uses
+    UserInfoRecorder --> Image : uses
+    UserInfoRecorder --> Button : uses
+    UserInfoRecorder --> TMP_Text : uses
+    UserInfoRecorder --> GameObject : uses
+    UserInfoRecorder --> Sprite : uses
+    UserInfoRecorder --> Texture2D : uses
+```

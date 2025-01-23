@@ -1,0 +1,372 @@
+文件源代码内容如下：
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEditor;
+
+public class MultipleTagButtonCreator : MonoBehaviour
+{
+    // 六个TagLibrary的引用，每个都对应一个资源文件
+    public TagLibrary typeTagLibrary;
+    public TagLibrary themeTagLibrary;
+    public TagLibrary functionTagLibrary;
+    public TagLibrary batchTagLibrary;
+    public TagLibrary propertyTagLibrary;
+    public TagLibrary definitionTagLibrary;
+
+    // 六种类型的按钮预制体
+    public GameObject typeButtonPrefab;
+    public GameObject themeButtonPrefab;
+    public GameObject functionButtonPrefab;
+    public GameObject batchButtonPrefab;
+    public GameObject propertyButtonPrefab;
+    public GameObject definitionButtonPrefab;
+
+    // 六个按钮父对象的引用，每个都对应一个UI面板
+    public Transform typeButtonParent;
+    public Transform themeButtonParent;
+    public Transform functionButtonParent;
+    public Transform batchButtonParent;
+    public Transform propertyButtonParent;
+    public Transform definitionButtonParent;
+
+    // ResourceFilterResult的引用
+    public ResourceFilterResult filterResult;
+
+    // 用于更改按钮颜色的字段
+    public Color selectedColor = Color.green;
+
+    // 存储所有标签按钮的字典
+    private Dictionary<string, (Button button, Color originalColor)> tagButtons = new Dictionary<string, (Button, Color)>();
+
+    private void Start()
+    {
+        if (filterResult == null)
+        {
+            Debug.LogError("ResourceFilterResult 引用未设置。");
+            return;
+        }
+
+        // 动态创建按钮
+        CreateButtonsForLibrary(typeTagLibrary, typeButtonPrefab, typeButtonParent, "type");
+        CreateButtonsForLibrary(themeTagLibrary, themeButtonPrefab, themeButtonParent, "theme");
+        CreateButtonsForLibrary(functionTagLibrary, functionButtonPrefab, functionButtonParent, "function");
+        CreateButtonsForLibrary(batchTagLibrary, batchButtonPrefab, batchButtonParent, "batch");
+        CreateButtonsForLibrary(propertyTagLibrary, propertyButtonPrefab, propertyButtonParent, "property");
+        CreateButtonsForLibrary(definitionTagLibrary, definitionButtonPrefab, definitionButtonParent, "definition");
+    }
+
+    // 新增方法：根据给定的标签集合更新按钮的可见性
+    public void UpdateTagButtonVisibility(HashSet<string> visibleTags)
+    {
+        foreach (KeyValuePair<string, (Button button, Color originalColor)> tagButtonPair in tagButtons)
+        {
+            // 如果visibleTags包含这个标签，那么按钮应该显示，否则隐藏
+            tagButtonPair.Value.button.gameObject.SetActive(visibleTags.Contains(tagButtonPair.Key));
+        }
+    }
+
+    // 对指定的TagLibrary创建按钮的方法
+    private void CreateButtonsForLibrary(TagLibrary tagLibrary, GameObject buttonPrefab, Transform buttonParent, string tagType)
+    {
+        if (tagLibrary == null || buttonPrefab == null || buttonParent == null)
+        {
+            Debug.LogError("请确保所有引用都已正确设置。");
+            return;
+        }
+
+        // 清除旧的按钮
+        foreach (Transform child in buttonParent)
+        {
+            Destroy(child.gameObject);
+        }
+
+        // 为每个标签创建按钮
+        foreach (var tag in tagLibrary.Tags)
+        {
+            GameObject buttonObj = Instantiate(buttonPrefab, buttonParent);
+            var textComponent = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
+            var button = buttonObj.GetComponent<Button>();
+            var buttonImage = buttonObj.GetComponent<Image>();
+            if (textComponent != null && button != null)
+            {
+                textComponent.text = tag;
+                Color originalColor = buttonImage.color;  // 保存初始颜色
+                button.onClick.AddListener(() => ToggleTagAndFilter(tag, buttonImage, originalColor, tagType));
+
+                // 保存按钮状态
+                tagButtons[tag] = (button, originalColor);
+            }
+            else
+            {
+                Debug.LogError("预制体上没有找到TextMeshProUGUI或Button组件。");
+            }
+        }
+    }
+
+    // 切换标签并更新筛选结果的方法
+    private void ToggleTagAndFilter(string tag, Image buttonImage, Color originalColor, string tagType)
+    {
+        List<string> updatedTags = new List<string>();
+
+        // 根据传递的tagType选择正确的标签数组
+        switch (tagType)
+        {
+            case "type":
+                updatedTags = filterResult.typeTag.ToList();
+                break;
+            case "theme":
+                updatedTags = filterResult.themeTag.ToList();
+                break;
+            case "function":
+                updatedTags = filterResult.functionTag.ToList();
+                break;
+            case "batch":
+                updatedTags = filterResult.batchTag.ToList();
+                break;
+            case "property":
+                updatedTags = filterResult.propertyTag.ToList();
+                break;
+            case "definition":
+                updatedTags = filterResult.definitionTag.ToList();
+                break;
+        }
+
+        // 添加或移除标签，并更新按钮颜色
+        if (!updatedTags.Contains(tag))
+        {
+            updatedTags.Add(tag);
+            buttonImage.color = selectedColor;
+        }
+        else
+        {
+            updatedTags.Remove(tag);
+            buttonImage.color = originalColor; // 恢复到原始颜色
+        }
+
+        // 将更新后的标签数组保存回对应的标签字段
+        switch (tagType)
+        {
+            case "type":
+                filterResult.typeTag = updatedTags.ToArray();
+                break;
+            case "theme":
+                filterResult.themeTag = updatedTags.ToArray();
+                break;
+            case "function":
+                filterResult.functionTag = updatedTags.ToArray();
+                break;
+            case "batch":
+                filterResult.batchTag = updatedTags.ToArray();
+                break;
+            case "property":
+                filterResult.propertyTag = updatedTags.ToArray();
+                break;
+            case "definition":
+                filterResult.definitionTag = updatedTags.ToArray();
+                break;
+        }
+
+        filterResult.FilterAndPrintResources();
+    }
+
+    // 重置所有标签按钮状态的方法
+    public void ResetAllTagButtonStates()
+    {
+        foreach (var tagButtonPair in tagButtons)
+        {
+            tagButtonPair.Value.button.interactable = true;
+            tagButtonPair.Value.button.image.color = tagButtonPair.Value.originalColor;
+        }
+    }
+}
+
+
+
+源代码内容解释如下：
+### 1. 功能概览
+
+**功能定位：**  
+`MultipleTagButtonCreator` 是一个用于动态创建和管理标签按钮的脚本，支持通过点击按钮切换标签状态，并根据标签状态过滤资源。它在资源管理与展示系统中扮演核心角色，提供灵活的标签筛选功能。
+
+**系统角色：**  
+该脚本负责将标签数据转换为UI按钮，并通过按钮交互控制资源过滤逻辑，是用户与系统交互的重要接口。
+
+**主要特性与技术实现：**  
+- **动态按钮生成：** 根据不同的标签库动态创建按钮，支持六种不同类型的标签。
+- **状态管理：** 维护按钮的选中状态，并通过颜色变化提供视觉反馈。
+- **过滤机制：** 集成 `ResourceFilterResult` 实现资源过滤逻辑。
+- **工厂模式：** 使用预制体快速生成按钮实例。
+- **事件驱动：** 通过按钮点击事件触发标签切换和过滤操作。
+
+---
+
+### 2. 核心类解析
+
+**类名称：** `MultipleTagButtonCreator`
+
+**职责说明：**  
+- 动态生成不同类型的标签按钮。
+- 管理按钮的交互状态和视觉反馈。
+- 根据标签状态更新资源过滤结果。
+
+**关键方法清单：**  
+- `public void UpdateTagButtonVisibility(HashSet<string> visibleTags)`：更新按钮可见性。
+- `private void CreateButtonsForLibrary(TagLibrary tagLibrary, GameObject buttonPrefab, Transform buttonParent, string tagType)`：生成指定标签库的按钮。
+- `private void ToggleTagAndFilter(string tag, Image buttonImage, Color originalColor, string tagType)`：切换标签并更新过滤结果。
+- `public void ResetAllTagButtonStates()`：重置所有按钮状态。
+
+**继承关系：**  
+```mermaid
+classDiagram
+    class MultipleTagButtonCreator {
+        +MonoBehaviour
+    }
+```
+
+**依赖模块：**  
+- `TagLibrary`：存储不同类型的标签数据。
+- `ResourceFilterResult`：处理资源过滤逻辑。
+- `UnityEngine.UI`：提供按钮和UI组件功能。
+- `TextMeshPro`：用于文本显示。
+
+---
+
+### 3. 关键方法详解
+
+#### 方法一：`UpdateTagButtonVisibility`
+
+**方法签名：**  
+```csharp
+public void UpdateTagButtonVisibility(HashSet<string> visibleTags)
+```
+
+**功能描述：**  
+根据传入的可见标签集合，动态控制按钮的显示或隐藏。  
+- 如果按钮对应的标签在集合中，则显示按钮；否则隐藏。
+
+**调用关系：**  
+通常由资源管理模块调用，频率取决于过滤操作的触发频率（如用户筛选设置变化）。
+
+---
+
+#### 方法二：`CreateButtonsForLibrary`
+
+**方法签名：**  
+```csharp
+private void CreateButtonsForLibrary(TagLibrary tagLibrary, GameObject buttonPrefab, Transform buttonParent, string tagType)
+```
+
+**功能描述：**  
+根据指定的标签库生成按钮，并绑定点击事件。  
+- 清除旧按钮。
+- 遍历标签库中的每个标签，生成按钮并设置文本。
+- 将按钮状态存储到字典中，以便后续管理。
+
+**算法说明：**  
+- 使用工厂模式生成按钮实例。
+- 通过预制体快速复用按钮样式和组件。
+
+**调用关系：**  
+在 `Start` 方法中被调用，生成所有类型的标签按钮。
+
+---
+
+#### 方法三：`ToggleTagAndFilter`
+
+**方法签名：**  
+```csharp
+private void ToggleTagAndFilter(string tag, Image buttonImage, Color originalColor, string tagType)
+```
+
+**功能描述：**  
+切换标签状态并更新按钮颜色。  
+- 根据标签类型从 `ResourceFilterResult` 中获取标签数组。
+- 添加或移除当前标签，并更新按钮颜色。
+- 调用 `FilterAndPrintResources` 执行资源过滤。
+
+**算法说明：**  
+- 使用 `switch` 语句处理不同标签类型。
+- 通过颜色变化提供直观的视觉反馈。
+
+**调用关系：**  
+由按钮的点击事件触发，频率取决于用户的交互操作。
+
+---
+
+#### 方法四：`ResetAllTagButtonStates`
+
+**方法签名：**  
+```csharp
+public void ResetAllTagButtonStates()
+```
+
+**功能描述：**  
+重置所有按钮的状态，包括颜色和交互性。  
+- 恢复按钮的原始颜色。
+- 重新启用所有按钮的交互功能。
+
+**调用关系：**  
+通常在过滤操作完成后调用，频率较低。
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class MultipleTagButtonCreator {
+        +TagLibrary typeTagLibrary
+        +TagLibrary themeTagLibrary
+        +TagLibrary functionTagLibrary
+        +TagLibrary batchTagLibrary
+        +TagLibrary propertyTagLibrary
+        +TagLibrary definitionTagLibrary
+        +GameObject typeButtonPrefab
+        +GameObject themeButtonPrefab
+        +GameObject functionButtonPrefab
+        +GameObject batchButtonPrefab
+        +GameObject propertyButtonPrefab
+        +GameObject definitionButtonPrefab
+        +Transform typeButtonParent
+        +Transform themeButtonParent
+        +Transform functionButtonParent
+        +Transform batchButtonParent
+        +Transform propertyButtonParent
+        +Transform definitionButtonParent
+        +ResourceFilterResult filterResult
+        +Color selectedColor
+        +Dictionary<string, (Button, Color)> tagButtons
+        +void Start()
+        +void UpdateTagButtonVisibility(HashSet<string> visibleTags)
+        +void CreateButtonsForLibrary(TagLibrary, GameObject, Transform, string)
+        +void ToggleTagAndFilter(string, Image, Color, string)
+        +void ResetAllTagButtonStates()
+    }
+    class TagLibrary {
+        +List<string> Tags
+    }
+    class ResourceFilterResult {
+        +string[] typeTag
+        +string[] themeTag
+        +string[] functionTag
+        +string[] batchTag
+        +string[] propertyTag
+        +string[] definitionTag
+        +void FilterAndPrintResources()
+    }
+    class GameObject {}
+    class Transform {}
+    class Button {}
+    class Image {}
+    class TextMeshProUGUI {}
+    MultipleTagButtonCreator --> TagLibrary
+    MultipleTagButtonCreator --> ResourceFilterResult
+    MultipleTagButtonCreator --> GameObject
+    MultipleTagButtonCreator --> Transform
+    MultipleTagButtonCreator --> Button
+    MultipleTagButtonCreator --> Image
+    MultipleTagButtonCreator --> TextMeshProUGUI
+```

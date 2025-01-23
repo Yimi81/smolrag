@@ -1,0 +1,217 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEngine;
+using UnityEditor;
+using System.Collections.Generic;
+
+public class ResourceLoaderWindow : EditorWindow
+{
+    string prefabPaths = ""; // 存储多个预制体路径
+    Vector2 scrollPosition; // 用于滚动视图
+
+    // 添加菜单项用于打开窗口
+    [MenuItem("ZTResource/资源导入场景", false, 3)]
+    public static void ShowWindow()
+    {
+        // 显示现有窗口实例。如果没有，就创建一个。
+        EditorWindow.GetWindow(typeof(ResourceLoaderWindow), true, "资源加载");
+    }
+
+    void OnGUI()
+    {
+        // 界面布局开始
+        GUILayout.Label("粘贴预制体路径 (每行一个):", EditorStyles.boldLabel);
+
+        // 创建一个滚动视图
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, GUILayout.Height(200));
+        // 使用TextArea接收多行输入
+        prefabPaths = EditorGUILayout.TextArea(prefabPaths, GUILayout.ExpandHeight(true));
+        EditorGUILayout.EndScrollView();
+
+        // 载入按钮
+        if (GUILayout.Button("加载资源"))
+        {
+            LoadPrefabsIntoScene(prefabPaths);
+        }
+    }
+
+    // 加载多个预制体到场景中的函数
+    void LoadPrefabsIntoScene(string paths)
+    {
+        // 分割输入的多个路径
+        string[] allPaths = paths.Split('\n');
+        List<GameObject> instantiatedPrefabs = new List<GameObject>();
+
+        foreach (string path in allPaths)
+        {
+            // 清除空白字符
+            string trimmedPath = path.Trim();
+            if (!string.IsNullOrEmpty(trimmedPath))
+            {
+                // 加载并实例化预制体
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(trimmedPath);
+                if (prefab != null)
+                {
+                    GameObject instantiatedPrefab = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                    instantiatedPrefabs.Add(instantiatedPrefab); // 添加到列表
+                    Debug.Log("预制体加载成功：" + trimmedPath);
+                }
+                else
+                {
+                    Debug.LogError("无法加载预制体，检查路径是否正确：" + trimmedPath);
+                }
+            }
+        }
+
+        // 选中所有实例化的预制体
+        if (instantiatedPrefabs.Count > 0)
+        {
+            Selection.objects = instantiatedPrefabs.ToArray();
+        }
+    }
+}
+#endif
+源代码内容解释如下：
+# 代码文件分析
+
+## 1. 功能概览
+
+### 功能定位
+该代码文件提供了一个Unity编辑器扩展窗口，用于将预制体资源加载到当前场景中。用户可以通过粘贴预制体路径到窗口中，点击按钮批量加载这些预制体。
+
+### 系统角色
+作为Unity编辑器脚本，该文件扩展了编辑器功能，提供了便捷的预制体加载工具，提升开发效率。它帮助开发者快速将多个预制体实例化到场景中，同时提供路径验证和加载状态反馈。
+
+### 主要特性
+- **批量加载**：支持通过多行输入一次性加载多个预制体
+- **路径验证**：自动处理路径分割和空白字符清理
+- **实例化管理**：使用PrefabUtility进行安全的预制体实例化
+- **用户反馈**：通过Unity调试日志提供加载状态反馈
+
+### 技术实现
+- **Unity编辑器扩展**：基于EditorWindow创建自定义编辑器窗口
+- **多行文本处理**：使用GUILayout和ScrollView处理多行输入
+- **预制体加载**：通过AssetDatabase和PrefabUtility实现安全的预制体加载和实例化
+
+## 2. 核心类解析
+
+### ResourceLoaderWindow
+
+#### 职责说明
+该类创建并管理一个编辑器窗口，提供用户界面用于粘贴预制体路径并执行加载操作。主要负责预制体路径的输入处理、加载逻辑以及用户界面的绘制。
+
+#### 关键方法清单
+- `ShowWindow()`：静态方法，用于显示编辑器窗口
+- `OnGUI()`：绘制用户界面并处理用户输入
+- `LoadPrefabsIntoScene(string paths)`：加载预制体到场景中的核心逻辑
+
+#### 继承关系
+```
+ResourceLoaderWindow -> EditorWindow -> MonoBehaviour
+```
+
+#### 依赖模块
+- `UnityEngine`：Unity核心功能
+- `UnityEditor`：Unity编辑器扩展功能
+- `System.Collections.Generic`：使用List存储实例化的预制体
+
+## 3. 关键方法详解
+
+### 3.1 ShowWindow()
+
+#### 方法签名
+```csharp
+[MenuItem("ZTResource/资源导入场景", false, 3)]
+public static void ShowWindow()
+```
+
+#### 功能描述
+创建并显示ResourceLoaderWindow实例。如果已有实例存在，直接显示该实例。
+
+#### 算法说明
+直接调用EditorWindow.GetWindow方法创建或显示窗口实例。
+
+#### 调用关系
+- 被MenuItem属性触发，当用户在菜单中选择"ZTResource/资源导入场景"时调用
+
+### 3.2 OnGUI()
+
+#### 方法签名
+```csharp
+void OnGUI()
+```
+
+#### 功能描述
+绘制编辑器窗口的用户界面，包括滚动视图、文本输入区域和加载按钮。
+
+#### 功能步骤
+1. 绘制标签文本
+2. 创建滚动视图
+3. 添加文本输入区域，允许用户粘贴多行预制体路径
+4. 添加加载按钮，点击后调用LoadPrefabsIntoScene方法
+
+#### 调用关系
+- 由Unity编辑器框架自动调用，每帧绘制界面
+
+### 3.3 LoadPrefabsIntoScene(string paths)
+
+#### 方法签名
+```csharp
+void LoadPrefabsIntoScene(string paths)
+```
+
+#### 功能描述
+将输入的多行预制体路径转换为预制体实例，加载到当前场景中。
+
+#### 功能步骤
+1. 按换行符分割输入字符串为路径数组
+2. 遍历每个路径，清理空白字符
+3. 加载预制体，如果成功则实例化并记录日志
+4. 最终选中所有实例化的预制体
+
+#### 算法说明
+- 使用Split('\n')分割路径字符串
+- 使用Trim()清理路径空白字符
+- 使用AssetDatabase.LoadAssetAtPath<GameObject>加载预制体
+- 使用PrefabUtility.InstantiatePrefab实例化预制体
+
+#### 调用关系
+- 由OnGUI中的加载按钮点击事件触发
+- 每次按钮点击时调用一次
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class EditorWindow {
+        +void OnGUI()
+        +static EditorWindow GetWindow(System.Type type, bool focus, string title)
+    }
+
+    class MonoBehaviour {
+        +void Awake()
+        +void Start()
+        +void Update()
+    }
+
+    class ResourceLoaderWindow <<Abstract>> {
+        +void OnGUI()
+        +void LoadPrefabsIntoScene(string paths)
+        +static void ShowWindow()
+    }
+
+    ResourceLoaderWindow --> EditorWindow : inheritance
+    EditorWindow --> MonoBehaviour : inheritance
+
+    ResourceLoaderWindow --> AssetDatabase : dependency
+    ResourceLoaderWindow --> PrefabUtility : dependency
+    ResourceLoaderWindow --> Debug : dependency
+    ResourceLoaderWindow --> GameObject : dependency
+```
+
+---
+
+## 总结
+
+该脚本文件提供了一个实用的预制体加载工具，通过Unity编辑器扩展实现。核心类ResourceLoaderWindow通过继承EditorWindow实现了自定义编辑器窗口，提供了用户友好的界面和批量加载功能。关键方法ShowWindow、OnGUI和LoadPrefabsIntoScene分别负责窗口显示、界面绘制和预制体加载。整体设计简洁高效，适合用于Unity开发中的预制体资源管理。

@@ -1,0 +1,255 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEngine;
+using System.IO;
+using System.Text;
+using System.Linq;
+using System.Collections.Generic;
+using System;
+
+public class ScriptEncodingConverter : EditorWindow
+{
+    private List<string> filePaths = new List<string>(); // 存储拖拽的文件路径
+    private HashSet<string> directories = new HashSet<string>(); // 存储拖拽的文件夹路径
+
+    [MenuItem("ZTResource/Tools/其他/**批量修改编码**")]
+    public static void ShowWindow()
+    {
+        GetWindow<ScriptEncodingConverter>("Script Encoding Converter");
+    }
+
+    private void OnGUI()
+    {
+        GUILayout.Label("批量修改脚本编码", EditorStyles.boldLabel);
+
+        // 显示拖拽区域
+        GUILayout.Label("拖拽文件夹或文件到这里:");
+        HandleDragAndDrop();
+
+        // 显示当前已添加的文件夹和文件
+        GUILayout.Label("已添加的文件夹:");
+        DisplayPathsWithRemoveButton(directories.ToList(), directories);
+
+        GUILayout.Label("已添加的文件:");
+        DisplayPathsWithRemoveButton(filePaths, null);
+
+        EditorGUILayout.Space();
+
+        if (GUILayout.Button("转换为 UTF-8"))
+        {
+            if (EditorUtility.DisplayDialog("确认", "确定要将所有脚本文件转换为UTF-8编码吗？此操作将覆盖源文件。", "确定", "取消"))
+            {
+                ConvertFilesToUTF8();
+            }
+        }
+    }
+
+    private void HandleDragAndDrop()
+    {
+        Event evt = Event.current;
+        Rect dropArea = GUILayoutUtility.GetRect(0.0f, 50.0f, GUILayout.ExpandWidth(true));
+        GUI.Box(dropArea, "拖拽文件夹或文件到这里");
+
+        switch (evt.type)
+        {
+            case EventType.DragUpdated:
+            case EventType.DragPerform:
+                if (!dropArea.Contains(evt.mousePosition))
+                    return;
+
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+                if (evt.type == EventType.DragPerform)
+                {
+                    DragAndDrop.AcceptDrag();
+
+                    foreach (string draggedObject in DragAndDrop.paths)
+                    {
+                        if (Directory.Exists(draggedObject))
+                        {
+                            directories.Add(draggedObject);
+                        }
+                        else if (File.Exists(draggedObject) && Path.GetExtension(draggedObject).Equals(".cs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            filePaths.Add(draggedObject);
+                        }
+                    }
+                }
+                Event.current.Use();
+                break;
+        }
+    }
+
+    private void ConvertFilesToUTF8()
+    {
+        try
+        {
+            List<string> allFiles = new List<string>(filePaths);
+
+            // 获取所有文件夹中的 .cs 文件
+            foreach (string directory in directories)
+            {
+                allFiles.AddRange(Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories)
+                                           .Where(f => !Path.GetFileName(f).StartsWith("._")));
+            }
+
+            if (allFiles.Count == 0)
+            {
+                Debug.LogError("未选择任何文件。");
+                return;
+            }
+
+            // 使用 UTF-8 编码写入文件
+            foreach (string file in allFiles)
+            {
+                string content = File.ReadAllText(file, Encoding.GetEncoding("GB2312"));
+                File.WriteAllText(file, content, new UTF8Encoding(false)); // 不包含 BOM
+                Debug.Log($"已转换文件: {file}");
+            }
+
+            AssetDatabase.Refresh();
+            Debug.Log($"文件已转换为 UTF-8 编码。转换了 {allFiles.Count} 个 .cs 文件。");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError("转换文件编码时出错: " + ex.Message);
+        }
+    }
+
+    private void DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet)
+    {
+        for (int i = 0; i < paths.Count; i++)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(paths[i]);
+            if (GUILayout.Button("移除", GUILayout.Width(60)))
+            {
+                if (pathSet != null)
+                {
+                    pathSet.Remove(paths[i]);
+                }
+                else
+                {
+                    filePaths.RemoveAt(i);
+                }
+            }
+            GUILayout.EndHorizontal();
+        }
+    }
+}
+#endif
+
+源代码内容解释如下：
+# ScriptEncodingConverter代码分析
+
+## 1. 功能概览
+
+### 功能定位
+ScriptEncodingConverter是一个Unity编辑器扩展工具，主要用于批量将C#脚本文件的编码从GB2312转换为UTF-8，支持拖放文件或文件夹进行处理。
+
+### 系统角色
+作为Unity编辑器工具，该脚本简化了开发者处理脚本文件编码的工作流程，提升了开发效率，是项目维护和代码管理的重要辅助工具。
+
+### 主要特性
+- **拖放功能**：支持将文件或文件夹拖放到窗口中
+- **批量处理**：可以一次性处理多个文件或整个文件夹下的所有脚本
+- **编码转换**：将文件编码从GB2312转换为UTF-8
+- **可视化界面**：提供友好的用户界面，显示已添加的文件和文件夹，并支持移除操作
+- **错误处理**：具有基本的异常处理机制，确保操作的稳定性
+
+## 2. 核心类解析
+
+### ScriptEncodingConverter类
+- **职责说明**：该类继承自EditorWindow，用于创建一个自定义的编辑器窗口，提供文件拖放、路径显示和编码转换功能。
+
+- **关键方法清单**：
+  - `public static void ShowWindow()`：显示编辑器窗口
+  - `private void OnGUI()`：绘制用户界面
+  - `private void HandleDragAndDrop()`：处理拖放事件
+  - `private void ConvertFilesToUTF8()`：执行编码转换
+  - `private void DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet)`：显示路径并提供移除功能
+
+- **继承关系**：
+  ```mermaid
+  classDiagram
+    ScriptEncodingConverter <|-- EditorWindow
+  ```
+
+- **依赖模块**：
+  - `EditorWindow`：Unity编辑器窗口基类
+  - `AssetDatabase`：用于刷新资源数据库
+  - `EditorUtility`：提供编辑器实用工具
+  - `GUILayout`, `GUILayoutUtility`, `GUI`：用于构建用户界面
+  - `Directory`, `File`, `Path`：用于文件和目录操作
+  - `Encoding`：用于编码转换
+
+## 3. 关键方法详解
+
+### 3.1. ShowWindow方法
+- **方法签名**：
+  ```csharp
+  [MenuItem("ZTResource/Tools/其他/**批量修改编码**")]
+  public static void ShowWindow()
+  ```
+- **功能描述**：通过MenuItem属性注册到Unity编辑器菜单中，点击后调用GetWindow方法显示ScriptEncodingConverter窗口。
+- **调用关系**：被Unity编辑器菜单调用，频率为用户点击时。
+
+### 3.2. OnGUI方法
+- **方法签名**：
+  ```csharp
+  private void OnGUI()
+  ```
+- **功能描述**：绘制编辑器窗口的用户界面，包括拖放区域、已添加路径的显示和转换按钮。
+- **调用关系**：由Unity编辑器框架定期调用，用于更新界面。
+
+### 3.3. HandleDragAndDrop方法
+- **方法签名**：
+  ```csharp
+  private void HandleDragAndDrop()
+  ```
+- **功能描述**：处理用户的拖放操作，将拖放的文件或文件夹路径添加到相应的集合中。
+- **算法说明**：通过检查拖放事件，判断拖放的路径是文件还是文件夹，并分别添加到filePaths或directories中。
+- **调用关系**：在OnGUI方法中被调用，频率为用户执行拖放操作时。
+
+### 3.4. ConvertFilesToUTF8方法
+- **方法签名**：
+  ```csharp
+  private void ConvertFilesToUTF8()
+  ```
+- **功能描述**：将所有已添加的C#脚本文件从GB2312编码转换为UTF-8编码。
+- **算法说明**：
+  1. 收集所有要转换的文件路径。
+  2. 读取文件内容，使用GB2312编码解码。
+  3. 使用UTF-8编码重新写入文件内容。
+  4. 刷新Unity资源数据库。
+- **调用关系**：在用户点击“转换为 UTF-8”按钮时被调用，频率为用户操作时。
+
+### 3.5. DisplayPathsWithRemoveButton方法
+- **方法签名**：
+  ```csharp
+  private void DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet)
+  ```
+- **功能描述**：显示已添加的路径，并提供移除按钮。
+- **算法说明**：遍历路径列表，为每个路径创建水平布局，显示路径名称和移除按钮，点击移除按钮后从集合中移除对应路径。
+- **调用关系**：在OnGUI方法中被调用，频率为界面更新时。
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+    ScriptEncodingConverter <|-- EditorWindow
+    ScriptEncodingConverter --> AssetDatabase
+    ScriptEncodingConverter --> EditorUtility
+    ScriptEncodingConverter --> GUILayout
+    ScriptEncodingConverter --> GUILayoutUtility
+    ScriptEncodingConverter --> GUI
+    ScriptEncodingConverter --> System.IO.Directory
+    ScriptEncodingConverter --> System.IO.File
+    ScriptEncodingConverter --> System.IO.Path
+    ScriptEncodingConverter --> System.Text.Encoding
+```
+
+## 5. 总结
+
+ScriptEncodingConverter通过提供一个用户友好的界面，简化了开发者处理脚本文件编码的工作流程，是Unity项目开发中一个实用的辅助工具。它利用了Unity编辑器的扩展机制，结合文件处理功能，实现了批量编码转换的便捷操作。

@@ -1,0 +1,168 @@
+文件源代码内容如下：
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using UnityEngine.Networking;
+using System.Collections;
+using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
+using System;
+
+public class AiSearch : MonoBehaviour
+{
+    public Button sendButton;
+    public TMP_InputField inputField;
+    public TMP_Text resultText;
+
+    // 引用 ResourceFilterResult，用于访问搜索记录
+    public ResourceFilterResult resourceFilterResult;
+
+    // 定义事件
+    public event Action<List<string>> OnQueryResultReceived;
+
+    void Start()
+    {
+        sendButton.onClick.AddListener(OnSendButtonClick);
+    }
+
+    void OnSendButtonClick()
+    {
+        string query = inputField.text;
+
+        // 添加搜索记录
+        if (resourceFilterResult != null)
+        {
+            resourceFilterResult.AddSearchHistory(query);
+        }
+
+        StartCoroutine(SendQuery(query));
+    }
+
+    IEnumerator SendQuery(string query)
+    {
+        string url = "http://10.1.14.151:8005/vectory_query";
+        string jsonData = $"{{\"query\": \"{query}\", \"numbers\": 500, \"return_fields\": [\"id\"]}}";
+
+        UnityWebRequest request = new UnityWebRequest(url, "POST");
+        byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
+        request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+        request.downloadHandler = new DownloadHandlerBuffer();
+        request.SetRequestHeader("Content-Type", "application/json");
+
+        yield return request.SendWebRequest();
+
+        if (request.result == UnityWebRequest.Result.Success)
+        {
+            string result = request.downloadHandler.text;
+
+            // 解析返回的JSON数据
+            JToken ids = JToken.Parse(result)["ids"];
+            if (ids != null)
+            {
+                List<string> idList = ids.ToObject<List<string>>();
+                resultText.text = string.Join(",", idList);
+
+                // 触发事件
+                OnQueryResultReceived?.Invoke(idList);
+            }
+            else
+            {
+                resultText.text = "No IDs found.";
+            }
+        }
+        else
+        {
+            resultText.text = "Error: " + request.error;
+        }
+    }
+}
+
+源代码内容解释如下：
+### 1. 功能概览
+
+#### 用简洁的段落总结代码文件的整体功能定位
+该代码文件 `AiSearch.cs` 是一个用于实现AI搜索功能的Unity脚本。它通过用户输入的搜索词向指定的API发送HTTP POST请求，并处理返回的搜索结果。
+
+#### 说明其在系统/项目中的角色和重要性
+该脚本在系统中扮演搜索逻辑的核心角色，是用户与后端API交互的关键组件。它负责：
+- 用户输入的获取
+- HTTP请求的发送
+- 搜索结果的处理与展示
+- 搜索历史记录的维护
+
+#### 列举支持的主要特性与技术实现方案
+- **用户输入处理**：通过Unity UI组件（TMP_InputField）获取搜索词
+- **HTTP请求**：使用UnityWebRequest进行POST请求
+- **JSON处理**：通过 Newtonsoft.Json.Linq 解析返回的JSON数据
+- **事件驱动**：通过自定义事件 OnQueryResultReceived 通知其他组件
+- **搜索历史**：通过 ResourceFilterResult 组件记录搜索历史
+
+### 2. 核心类解析
+
+#### AiSearch
+- **职责说明**：该类负责处理AI搜索的逻辑，包括用户输入获取、HTTP请求发送、结果处理以及与其它组件的交互。
+- **关键方法清单**：
+  - `void Start()`：初始化UI事件监听
+  - `void OnSendButtonClick()`：处理发送按钮点击事件
+  - `IEnumerator SendQuery(string query)`：执行搜索请求并处理响应
+- **继承关系**：
+  ```
+  AiSearch -> MonoBehaviour
+  ```
+- **依赖模块**：
+  - `UnityEngine.UI.Button`
+  - `UnityEngine.UI.InputField`
+  - `UnityEngine.UI.Text`
+  - `ResourceFilterResult`（项目内组件）
+
+### 3. 关键方法详解
+
+#### `void Start()`
+- **方法签名**：`void Start()`
+- **功能描述**：在脚本初始化时注册发送按钮的点击事件监听器。
+- **调用关系**：由Unity引擎在脚本初始化时调用，后续会触发 `OnSendButtonClick` 方法。
+
+#### `void OnSendButtonClick()`
+- **方法签名**：`void OnSendButtonClick()`
+- **功能描述**：处理发送按钮的点击事件，获取输入框的文本内容并执行搜索操作。
+- **调用关系**：由 `Start()` 方法注册的点击事件触发，后续会调用 `SendQuery()` 方法。
+
+#### `IEnumerator SendQuery(string query)`
+- **方法签名**：`IEnumerator SendQuery(string query)`
+- **功能描述**：执行搜索请求，包括：
+  1. 构建请求URL和JSON数据
+  2. 发送POST请求
+  3. 处理服务器返回的结果
+  4. 更新UI显示
+  5. 触发自定义事件 `OnQueryResultReceived`
+- **算法说明**：
+  - 使用协程（Coroutine）处理异步HTTP请求
+  - 使用 `UnityWebRequest` 发送POST请求
+  - 使用 `Newtonsoft.Json.Linq` 解析JSON响应
+- **调用关系**：由 `OnSendButtonClick()` 方法调用，通常在用户点击发送按钮时触发。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+  class AiSearch
+  {
+    +Button sendButton
+    +TMP_InputField inputField
+    +TMP_Text resultText
+    +ResourceFilterResult resourceFilterResult
+    +event OnQueryResultReceived
+    +void Start()
+    +void OnSendButtonClick()
+    +IEnumerator SendQuery(string query)
+  }
+
+  class MonoBehaviour
+  {
+    // 省略 MonoBehaviour 的其他成员
+  }
+
+  AiSearch --> MonoBehaviour
+  AiSearch --> ResourceFilterResult
+```

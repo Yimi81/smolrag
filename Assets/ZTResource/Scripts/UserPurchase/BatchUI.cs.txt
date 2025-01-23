@@ -1,0 +1,400 @@
+文件源代码内容如下：
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class BatchUI : MonoBehaviour
+{
+    public TextMeshProUGUI batchNameText;
+    public TextMeshProUGUI batchTimeText;
+    public Transform contentParent;
+    public GameObject cardPrefab;
+    public float cardHeightIncrement;  // 这个高度值由你来设定
+    public float defaultHeight; // 默认高度
+    public TMP_InputField batchNameInputField; // 用于修改批次名称的输入字段
+    public Button saveBatchNameButton;  // 用于保存批次名称的按钮
+    public Button deleteBatchButton; // 用于删除批次的按钮
+    public Button addAllToCartButton; // 新增按钮用于将所有资源添加到购物车
+    public GameObject slotObject; // 新增的插槽对象
+    public Button collapseButton; // 折叠/展开按钮
+    private bool isCollapsed = false; // 用于标记当前批次是否折叠
+
+    private string csvFilePath; // 新增存储CSV文件路径的字段
+
+    private List<CardInfo> savedCardInfos = new List<CardInfo>(); // 保存卡片数据的列表
+
+
+    public RectTransform rectTransform;
+
+    private void OnEnable()
+    {
+        UpdateHeight(contentParent.childCount - 1); // 减去一个BatchRecord
+
+        // 初始化时隐藏插槽中的对象
+        slotObject.SetActive(false);
+
+        // 订阅InputField的事件
+        batchNameInputField.onValueChanged.AddListener(OnInputFieldValueChanged);
+        batchNameInputField.onEndEdit.AddListener(OnInputFieldEndEdit);
+
+        // 添加新的按钮事件监听器
+        addAllToCartButton.onClick.AddListener(OnAddAllToCartButtonClicked);
+        collapseButton.onClick.AddListener(ToggleCollapse); // 添加折叠按钮事件
+    }
+
+    // 切换折叠状态的方法
+    private void ToggleCollapse()
+    {
+        isCollapsed = !isCollapsed;
+
+        if (isCollapsed)
+        {
+            // 折叠时，仅隐藏所有CardPrefab对象
+            foreach (Transform child in contentParent)
+            {
+                if (child.gameObject.CompareTag("CardPrefab"))
+                {
+                    child.gameObject.SetActive(false); // 隐藏卡片
+                }
+            }
+            // 更新高度为默认高度
+            rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, defaultHeight);
+        }
+        else
+        {
+            // 展开时，仅显示所有隐藏的CardPrefab对象
+            foreach (Transform child in contentParent)
+            {
+                if (child.gameObject.CompareTag("CardPrefab"))
+                {
+                    child.gameObject.SetActive(true); // 显示卡片
+                }
+            }
+            // 更新高度为重新显示的Card数量的高度
+            UpdateHeight(contentParent.childCount - 1); // 恢复高度
+        }
+
+        // 通过旋转按钮来表示折叠/展开状态
+        collapseButton.GetComponent<RectTransform>().localRotation = isCollapsed
+            ? Quaternion.Euler(0, 0, 0) // 折叠时旋转到0度
+            : Quaternion.Euler(0, 0, -90);  // 展开时旋转到-90度
+    }
+
+
+
+
+    private void OnTransformChildrenChanged()
+    {
+        UpdateHeight(contentParent.childCount - 1); // 减去一个BatchRecord
+    }
+
+
+    public void SetupBatch(string batchName, string batchTime, List<CardInfo> cardInfos, string csvFilePath)
+    {
+        this.csvFilePath = csvFilePath;
+
+        // 允许 batchName 为空
+        batchNameText.text = string.IsNullOrEmpty(batchName) ? "可输入批次名" : batchName;
+        batchTimeText.text = batchTime;
+
+        // 保存CardInfo数据
+        savedCardInfos = cardInfos;
+
+        // 创建新的Card
+        foreach (var cardInfo in cardInfos)
+        {
+            GameObject cardObject = Instantiate(cardPrefab, contentParent);
+            cardObject.tag = "CardPrefab"; // 给cardPrefab加上Tag方便管理
+            HistoryCardUI cardUI = cardObject.GetComponent<HistoryCardUI>();
+            cardUI.SetupCard(
+                cardInfo.ID,
+                cardInfo.Name,
+                cardInfo.Description,
+                cardInfo.Height,
+                cardInfo.Version,
+                cardInfo.PrefabPath,
+                cardInfo.ThumbnailPath,
+                cardInfo.TypeTags,
+                cardInfo.ThemeTags,
+                cardInfo.FunctionTags,
+                cardInfo.DefinitionTags,
+                cardInfo.BatchTags,
+                cardInfo.PropertyTags,
+                cardInfo.ModelFaces,
+                cardInfo.CreationDate,
+                cardInfo.UpdatedDate,
+                csvFilePath // 传递CSV文件路径
+            );
+        }
+
+        // 添加按钮事件监听
+        saveBatchNameButton.onClick.AddListener(SaveBatchName);
+        deleteBatchButton.onClick.AddListener(DeleteBatch);
+    }
+
+
+    // 动态更新高度的方法
+    public void UpdateHeight(int cardCount)
+    {
+        if (rectTransform != null)
+        {
+            float newHeight = defaultHeight + (cardCount * cardHeightIncrement);
+            rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, newHeight);
+        }
+    }
+
+    // 保存批次名称的方法
+    public void SaveBatchName()
+    {
+        string newBatchName = batchNameInputField.text;
+        string oldBatchTime = batchTimeText.text;
+        CSVParser.RenameBatch(csvFilePath, oldBatchTime, newBatchName);
+        batchNameText.text = newBatchName; // 更新UI显示的批次名称
+    }
+
+    // 删除批次的方法
+    public void DeleteBatch()
+    {
+        string batchTime = batchTimeText.text;
+        CSVParser.DeleteBatch(csvFilePath, batchTime);
+        Destroy(gameObject); // 删除自身实例
+    }
+
+    // 移除Card并更新高度的方法
+    public void RemoveCard(GameObject cardObject)
+    {
+        Destroy(cardObject);
+        UpdateHeight(contentParent.childCount - 2); // 减去一个BatchRecord和将要移除的Card
+    }
+
+    // 增加Card并更新高度的方法
+    public void AddCard(CardInfo cardInfo)
+    {
+
+        GameObject cardObject = Instantiate(cardPrefab, contentParent);
+        HistoryCardUI cardUI = cardObject.GetComponent<HistoryCardUI>();
+        cardUI.SetupCard(
+            cardInfo.ID,
+            cardInfo.Name,
+            cardInfo.Description,
+            cardInfo.Height,
+            cardInfo.Version,
+            cardInfo.PrefabPath,
+            cardInfo.ThumbnailPath,
+            cardInfo.TypeTags,
+            cardInfo.ThemeTags,
+            cardInfo.FunctionTags,
+            cardInfo.DefinitionTags,
+            cardInfo.BatchTags,
+            cardInfo.PropertyTags,
+            cardInfo.ModelFaces,
+            cardInfo.CreationDate,
+            cardInfo.UpdatedDate,
+            csvFilePath // 传递CSV文件路径
+        );
+
+        UpdateHeight(contentParent.childCount - 1); // 减去一个BatchRecord
+
+    }
+
+    // 输入框内容改变时显示插槽中的对象
+    private void OnInputFieldValueChanged(string value)
+    {
+        if (!slotObject.activeSelf)
+        {
+            slotObject.SetActive(true);
+        }
+    }
+
+    // 输入框失去焦点时隐藏插槽中的对象
+    private void OnInputFieldEndEdit(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            slotObject.SetActive(false);
+        }
+    }
+
+    // 将所有资源添加到购物车的方法
+    private void OnAddAllToCartButtonClicked()
+    {
+        foreach (Transform child in contentParent)
+        {
+            HistoryCardUI cardUI = child.GetComponent<HistoryCardUI>();
+            if (cardUI != null)
+            {
+                cardUI.OnAddButtonClicked();
+            }
+        }
+    }
+}
+源代码内容解释如下：
+### 1. 功能概览
+
+BatchUI 是一个用于管理批次信息的用户界面组件，主要负责显示和操作批次数据，包括批次名称、时间、资源卡片以及其他相关功能。它在系统中扮演着重要的角色，作为用户与批次数据交互的前端界面，支持的主要特性包括：
+
+- **批次信息显示**：展示批次名称、时间以及包含的资源卡片
+- **动态布局调整**：根据卡片数量自动调整UI高度
+- **交互功能**：支持保存批次名称、删除批次、添加/移除资源卡片
+- **折叠/展开功能**：允许用户隐藏或显示批次内容以优化界面
+- **批量操作**：提供将所有资源一次性添加到购物车的功能
+
+BatchUI 使用 Unity 的 MonoBehaviour 作为基类，通过事件订阅和委托实现交互逻辑，依赖 TMP_InputField、Button 等 UI 组件以及 CSVParser 进行数据持久化处理。
+
+---
+
+### 2. 核心类解析
+
+#### BatchUI 类
+
+- **职责说明**：BatchUI 是一个 MonoBehaviour 组件，负责管理批次的 UI 显示和交互逻辑，包括批次信息的展示、卡片的动态增删、高度调整以及用户操作的响应。
+
+- **关键方法清单**：
+  - `void SetupBatch(string batchName, string batchTime, List<CardInfo> cardInfos, string csvFilePath)`
+  - `void UpdateHeight(int cardCount)`
+  - `void SaveBatchName()`
+  - `void DeleteBatch()`
+  - `void RemoveCard(GameObject cardObject)`
+  - `void AddCard(CardInfo cardInfo)`
+  - `void ToggleCollapse()`
+
+- **继承关系**：BatchUI -> MonoBehaviour -> Component -> Object
+
+- **依赖模块**：
+  - 内部类：CardInfo
+  - 其他类：CSVParser（用于 CSV 文件操作）、HistoryCardUI（用于管理单个卡片的 UI）
+
+---
+
+### 3. 关键方法详解
+
+#### 3.1 `void SetupBatch(string batchName, string batchTime, List<CardInfo> cardInfos, string csvFilePath)`
+
+- **方法签名**：`public void SetupBatch(string batchName, string batchTime, List<CardInfo> cardInfos, string csvFilePath)`
+
+- **功能描述**：初始化批次 UI，设置批次名称、时间，并根据传入的 `cardInfos` 创建对应的卡片预制体（CardPrefab）。该方法还会为按钮添加事件监听器。
+
+- **算法说明**：该方法通过遍历 `cardInfos` 列表，使用 `Instantiate` 创建每个卡片的预制体，并调用 `HistoryCardUI` 的 `SetupCard` 方法初始化每个卡片的数据。
+
+- **调用关系**：通常在外部（如父容器或管理类）调用此方法来初始化批次数据。被 `OnEnable` 和外部管理类调用。
+
+---
+
+#### 3.2 `void UpdateHeight(int cardCount)`
+
+- **方法签名**：`public void UpdateHeight(int cardCount)`
+
+- **功能描述**：根据传入的卡片数量 `cardCount` 动态调整批次容器的高度，公式为 `defaultHeight + (cardCount * cardHeightIncrement)`。
+
+- **算法说明**：通过计算新的高度值，更新 `RectTransform` 的 `sizeDelta` 属性以调整 UI 容器的高度。
+
+- **调用关系**：在 `OnTransformChildrenChanged`、`ToggleCollapse`、`AddCard`、`RemoveCard` 等方法中被频繁调用，以确保 UI 高度始终与当前显示的卡片数量一致。
+
+---
+
+#### 3.3 `void SaveBatchName()`
+
+- **方法签名**：`public void SaveBatchName()`
+
+- **功能描述**：将用户输入的批次名称保存到 CSV 文件中，并更新 UI 显示。
+
+- **算法说明**：读取 `TMP_InputField` 的当前值，调用 `CSVParser.RenameBatch` 方法更新 CSV 文件中的批次名称，并更新 `batchNameText` 的显示。
+
+- **调用关系**：在 `saveBatchNameButton` 的点击事件中被调用。
+
+---
+
+#### 3.4 `void DeleteBatch()`
+
+- **方法签名**：`public void DeleteBatch()`
+
+- **功能描述**：删除当前批次的所有数据，并从 UI 中移除该批次组件。
+
+- **算法说明**：调用 `CSVParser.DeleteBatch` 方法删除 CSV 文件中的批次记录，然后调用 `Destroy(gameObject)` 销毁当前批次的 UI 组件。
+
+- **调用关系**：在 `deleteBatchButton` 的点击事件中被调用。
+
+---
+
+#### 3.5 `void AddCard(CardInfo cardInfo)`
+
+- **方法签名**：`public void AddCard(CardInfo cardInfo)`
+
+- **功能描述**：向批次中添加一个新的资源卡片，并更新 UI 显示。
+
+- **算法说明**：通过 `Instantiate` 创建一个新的卡片预制体，并调用 `HistoryCardUI` 的 `SetupCard` 方法初始化卡片数据，最后调用 `UpdateHeight` 更新批次容器的高度。
+
+- **调用关系**：在需要添加资源卡片的场景中被调用，例如用户点击“添加卡片”按钮时。
+
+---
+
+#### 3.6 `void ToggleCollapse()`
+
+- **方法签名**：`private void ToggleCollapse()`
+
+- **功能描述**：切换批次的折叠/展开状态，控制卡片的显示和隐藏，并调整 UI 高度。
+
+- **算法说明**：通过遍历 `contentParent` 的子节点，隐藏或显示所有标记为 "CardPrefab" 的卡片。在折叠状态下，UI 高度恢复为 `defaultHeight`；在展开状态下，UI 高度根据当前卡片数量重新计算。
+
+- **调用关系**：在 `collapseButton` 的点击事件中被调用。
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class BatchUI {
+        +MonoBehaviour
+        +TextMeshProUGUI batchNameText
+        +TextMeshProUGUI batchTimeText
+        +Transform contentParent
+        +GameObject cardPrefab
+        +float cardHeightIncrement
+        +float defaultHeight
+        +TMP_InputField batchNameInputField
+        +Button saveBatchNameButton
+        +Button deleteBatchButton
+        +Button addAllToCartButton
+        +GameObject slotObject
+        +Button collapseButton
+        +bool isCollapsed
+        +string csvFilePath
+        +List<CardInfo> savedCardInfos
+        +RectTransform rectTransform
+        +void SetupBatch(string, string, List<CardInfo>, string)
+        +void UpdateHeight(int)
+        +void SaveBatchName()
+        +void DeleteBatch()
+        +void RemoveCard(GameObject)
+        +void AddCard(CardInfo)
+        +void ToggleCollapse()
+    }
+
+    class MonoBehaviour {
+        +Component
+    }
+
+    class Component {
+        +Object
+    }
+
+    class Object {
+    }
+
+    class CSVParser {
+        +void RenameBatch(string, string, string)
+        +void DeleteBatch(string, string)
+    }
+
+    class HistoryCardUI {
+        +void SetupCard(string, string, string, float, string, string, string, List<string>, List<string>, List<string>, List<string>, List<string>, List<string>, int, string, string, string)
+        +void OnAddButtonClicked()
+    }
+
+    BatchUI --> CSVParser : 依赖
+    BatchUI --> HistoryCardUI : 依赖
+    BatchUI --> MonoBehaviour : 继承
+```

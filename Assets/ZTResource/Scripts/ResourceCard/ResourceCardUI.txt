@@ -1,0 +1,436 @@
+文件源代码内容如下：
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+public class ResourceCardUI : MonoBehaviour
+{
+    public TextMeshProUGUI idText;
+    public TextMeshProUGUI nameText;
+    public TextMeshProUGUI descriptionText;
+    public TextMeshProUGUI heightText;
+    public TextMeshProUGUI prefabPathText;
+    public Image thumbnailImage;
+    public TextMeshProUGUI typeTagsText;
+    public TextMeshProUGUI themeTagsText;
+    public TextMeshProUGUI functionTagsText;
+    public TextMeshProUGUI definitionTagsText;
+    public TextMeshProUGUI batchTagsText;
+    public TextMeshProUGUI propertyTagsText;
+    public TextMeshProUGUI modelFacesText;
+    public TextMeshProUGUI creationDateText;
+    public TextMeshProUGUI updatedDateText;
+    public TextMeshProUGUI versionText;
+
+    public SelectedCardSpawner selectedCardSpawner;
+    public ItemDetailsDisplay itemDetailsDisplay;
+
+    public GameObject targetParent;
+    public Button addButton;
+
+    private bool isCardSelected = false;
+    private static ResourceCardUI currentlySelectedCard;
+
+    public void SetupCard(
+        string id,
+        string name,
+        string description,
+        string height,
+        string prefabPath,
+        string thumbnailPath,
+        string modelFaces,
+        string creationDate,
+        string updatedDate,
+        string version,
+        string typeTags,
+        string themeTags,
+        string functionTags,
+        string definitionTags,
+        string batchTags,
+        string propertyTags
+    )
+    {
+        idText.text = id;
+        nameText.text = name;
+        descriptionText.text = description;
+        heightText.text = height;
+        prefabPathText.text = prefabPath;
+
+        string resourcePath = "ZT_IconTextures/" + thumbnailPath;
+        Texture2D thumbnail = Resources.Load<Texture2D>(resourcePath);
+
+        if (thumbnail != null)
+        {
+            thumbnailImage.sprite = Sprite.Create(thumbnail, new Rect(0.0f, 0.0f, thumbnail.width, thumbnail.height), new Vector2(0.5f, 0.5f), 100.0f);
+        }
+        else
+        {
+            Debug.LogWarning($"无法加载缩略图资源：{resourcePath}");
+        }
+
+        modelFacesText.text = modelFaces;
+        creationDateText.text = creationDate;
+        updatedDateText.text = updatedDate;
+        versionText.text = version;
+        typeTagsText.text = typeTags;
+        themeTagsText.text = themeTags;
+        functionTagsText.text = functionTags;
+        definitionTagsText.text = definitionTags;
+        batchTagsText.text = batchTags;
+        propertyTagsText.text = propertyTags;
+
+        if (addButton != null)
+        {
+            addButton.gameObject.SetActive(false);
+        }
+
+        // 获取当前卡片上的 PropertyInstanceManager 组件
+        var propertyInstanceManager = GetComponentInChildren<PropertyInstanceManager>();
+        if (propertyInstanceManager != null)
+        {
+            // 直接调用 PropertyInstanceManager 的更新方法
+            propertyInstanceManager.AddPropertyText(propertyTagsText);
+            propertyInstanceManager.UpdateInstanceVisibility(); // 手动触发更新
+        }
+    }
+
+    public void OnCardClicked()
+    {
+        itemDetailsDisplay.DisplayItemDetails(
+            idText.text,
+            nameText.text,
+            descriptionText.text,
+            heightText.text,
+            modelFacesText.text,
+            creationDateText.text,
+            updatedDateText.text,
+            versionText.text,
+            propertyTagsText.text
+        );
+
+#if UNITY_EDITOR
+        if (!string.IsNullOrEmpty(prefabPathText.text))
+        {
+            string assetPath = prefabPathText.text;
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+            if (asset != null)
+            {
+                Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+            }
+            else
+            {
+                Debug.LogError("Cannot find asset at path: " + assetPath);
+            }
+        }
+#endif
+
+        if (currentlySelectedCard != null && currentlySelectedCard != this)
+        {
+            currentlySelectedCard.DeselectCard();
+        }
+
+        isCardSelected = true;
+        if (addButton != null)
+        {
+            addButton.gameObject.SetActive(true);
+            addButton.onClick.AddListener(OnAddButtonClicked);
+        }
+
+        currentlySelectedCard = this;
+
+        if (targetParent != null)
+        {
+            AddOrReplacePrefab();
+        }
+    }
+
+    private void DeselectCard()
+    {
+        isCardSelected = false;
+        if (addButton != null)
+        {
+            addButton.gameObject.SetActive(false);
+            addButton.onClick.RemoveListener(OnAddButtonClicked);
+        }
+    }
+
+    private void OnAddButtonClicked()
+    {
+        if (isCardSelected)
+        {
+            string thumbnailPath = GetThumbnailPath();
+            selectedCardSpawner.SpawnSelectedCard(
+                idText.text,
+                nameText.text,
+                descriptionText.text,
+                heightText.text,
+                versionText.text,
+                prefabPathText.text,
+                thumbnailPath,
+                typeTagsText.text,
+                themeTagsText.text,
+                functionTagsText.text,
+                definitionTagsText.text,
+                batchTagsText.text,
+                propertyTagsText.text,
+                modelFacesText.text,
+                creationDateText.text,
+                updatedDateText.text
+            );
+
+            isCardSelected = false;
+            if (addButton != null)
+            {
+                addButton.gameObject.SetActive(false);
+                addButton.onClick.RemoveListener(OnAddButtonClicked);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("Card is not selected, aborting SpawnSelectedCard.");
+        }
+    }
+
+    private string GetThumbnailPath()
+    {
+        return thumbnailImage.sprite.texture.name;
+    }
+
+    private void AddOrReplacePrefab()
+    {
+        if (targetParent != null)
+        {
+            foreach (Transform child in targetParent.transform)
+            {
+                Destroy(child.gameObject);
+            }
+
+#if UNITY_EDITOR
+            string resourcePath = prefabPathText.text;
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(resourcePath);
+            if (prefab != null)
+            {
+                GameObject instantiatedPrefab = Instantiate(prefab, targetParent.transform.position, Quaternion.identity, targetParent.transform);
+                instantiatedPrefab.name = nameText.text;
+            }
+            else
+            {
+                Debug.LogError("Prefab未找到，请检查路径：" + resourcePath);
+            }
+#endif
+        }
+    }
+}
+
+源代码内容解释如下：
+```markdown
+# ResourceCardUI 类分析
+
+## 1. 功能概览
+
+### 功能定位
+
+ResourceCardUI 类是一个用于展示资源卡片信息的 UI 组件，主要负责显示资源的详细信息，并支持用户与卡片的交互操作。
+
+### 在系统中的角色
+
+ResourceCardUI 是资源管理系统中的一个重要 UI 组件，负责将资源信息以卡片的形式呈现给用户，并提供点击选择、添加资源等交互功能。
+
+### 主要特性与技术实现
+
+- **数据展示**：通过多个 TextMeshPro 组件展示资源的各类信息，包括 ID、名称、描述、高度、预制体路径等。
+- **缩略图加载**：从 Resources 文件夹加载资源的缩略图，并将其显示在卡片上。
+- **事件处理**：处理卡片点击事件，展示详细信息，并在 Unity Editor 环境中跳转到对应的预制体资产。
+- **选中状态管理**：维护卡片的选中状态，支持多卡片之间的选中切换。
+- **预制体实例化**：在目标父物体下实例化预制体，并支持替换已有预制体。
+
+## 2. 核心类解析
+
+### ResourceCardUI
+
+#### 职责说明
+
+ResourceCardUI 类的主要职责是：
+
+- 初始化并展示资源卡片的详细信息。
+- 处理用户对卡片的点击事件，展示详细信息并执行相关操作。
+- 管理卡片的选中状态。
+- 与其他 UI 组件（如 SelectedCardSpawner 和 ItemDetailsDisplay）交互，完成资源的添加和详细信息的展示。
+
+#### 关键方法清单
+
+- **SetupCard**：初始化卡片的显示内容。
+- **OnCardClicked**：处理卡片点击事件。
+- **DeselectCard**：取消卡片的选中状态。
+- **OnAddButtonClicked**：处理添加按钮点击事件。
+- **GetThumbnailPath**：获取缩略图的路径。
+- **AddOrReplacePrefab**：在目标父物体下实例化或替换预制体。
+
+#### 继承关系
+
+```plaintext
+ResourceCardUI -> MonoBehaviour
+```
+
+#### 依赖模块
+
+- **SelectedCardSpawner**：用于生成选中的卡片实例。
+- **ItemDetailsDisplay**：用于展示资源的详细信息。
+- **PropertyInstanceManager**：用于管理属性实例的可见性。
+
+## 3. 关键方法详解
+
+### SetupCard
+
+#### 方法签名
+
+```csharp
+public void SetupCard(
+    string id,
+    string name,
+    string description,
+    string height,
+    string prefabPath,
+    string thumbnailPath,
+    string modelFaces,
+    string creationDate,
+    string updatedDate,
+    string version,
+    string typeTags,
+    string themeTags,
+    string functionTags,
+    string definitionTags,
+    string batchTags,
+    string propertyTags
+)
+```
+
+#### 功能描述
+
+该方法用于初始化卡片的显示内容，包括资源的 ID、名称、描述、高度、预制体路径、缩略图、模型面数、创建日期、更新日期、版本、类型标签、主题标签、功能标签、定义标签、批次标签和属性标签。
+
+#### 调用关系
+
+该方法通常由资源管理系统的其他部分（如资源加载器或数据提供者）调用，用于展示资源卡片的详细信息。
+
+### OnCardClicked
+
+#### 方法签名
+
+```csharp
+public void OnCardClicked()
+```
+
+#### 功能描述
+
+该方法处理卡片的点击事件，执行以下操作：
+
+1. 调用 ItemDetailsDisplay 的 DisplayItemDetails 方法，展示资源的详细信息。
+2. 在 Unity Editor 环境中，跳转到对应的预制体资产。
+3. 管理卡片的选中状态，取消其他卡片的选中状态，设置当前卡片为选中状态。
+4. 显示添加按钮，并绑定添加按钮点击事件。
+
+#### 调用关系
+
+该方法在卡片被点击时自动调用。
+
+### DeselectCard
+
+#### 方法签名
+
+```csharp
+private void DeselectCard()
+```
+
+#### 功能描述
+
+该方法用于取消卡片的选中状态，执行以下操作：
+
+1. 将 isCardSelected 标记设置为 false。
+2. 隐藏添加按钮，并移除添加按钮的点击事件监听器。
+
+#### 调用关系
+
+该方法在 OnCardClicked 方法中调用，用于取消其他卡片的选中状态。
+
+### OnAddButtonClicked
+
+#### 方法签名
+
+```csharp
+private void OnAddButtonClicked()
+```
+
+#### 功能描述
+
+该方法处理添加按钮的点击事件，执行以下操作：
+
+1. 检查卡片是否处于选中状态。
+2. 获取缩略图的路径。
+3. 调用 SelectedCardSpawner 的 SpawnSelectedCard 方法，生成选中的卡片实例。
+4. 取消卡片的选中状态，隐藏添加按钮，并移除添加按钮的点击事件监听器。
+
+#### 调用关系
+
+该方法在 OnCardClicked 方法中绑定到添加按钮的点击事件，当添加按钮被点击时调用。
+
+### GetThumbnailPath
+
+#### 方法签名
+
+```csharp
+private string GetThumbnailPath()
+```
+
+#### 功能描述
+
+该方法返回当前卡片的缩略图的路径。
+
+#### 调用关系
+
+该方法在 OnAddButtonClicked 方法中调用，用于获取缩略图的路径。
+
+### AddOrReplacePrefab
+
+#### 方法签名
+
+```csharp
+private void AddOrReplacePrefab()
+```
+
+#### 功能描述
+
+该方法在目标父物体下实例化或替换预制体，执行以下操作：
+
+1. 遍历目标父物体下的所有子物体，并销毁它们。
+2. 在 Unity Editor 环境中，从指定路径加载预制体，并将其实例化为目标父物体的子物体。
+
+#### 调用关系
+
+该方法在 OnCardClicked 方法中调用，用于在目标父物体下显示或替换预制体。
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class MonoBehaviour
+    class ResourceCardUI <<Extend>> {
+        +SetupCard(string, string, string, string, string, string, string, string, string, string, string, string, string, string, string)
+        +OnCardClicked()
+        +DeselectCard()
+        +OnAddButtonClicked()
+        +GetThumbnailPath() : string
+        +AddOrReplacePrefab()
+    }
+
+    ResourceCardUI --> MonoBehaviour : Inherits from
+    ResourceCardUI --> SelectedCardSpawner : Uses
+    ResourceCardUI --> ItemDetailsDisplay : Uses
+    ResourceCardUI --> PropertyInstanceManager : Uses
+```

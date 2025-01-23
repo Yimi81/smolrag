@@ -1,0 +1,80 @@
+文件源代码内容如下：
+﻿using UnityEngine;
+
+// 放在一个通用的命名空间中
+[CreateAssetMenu(fileName = "NewTagLibrary", menuName = "TagSystem/TagLibrary", order = 0)]
+public class TagLibrary : ScriptableObject, ITagLibrary
+{
+    public string category;
+    public string[] tags;
+
+    public string[] Tags => tags;
+}
+
+源代码内容解释如下：
+### 1. 功能概览
+
+#### 代码文件整体功能定位
+这是一个Unity脚本文件，定义了一个名为 `TagLibrary` 的类。该类继承自 `ScriptableObject`，并实现了 `ITagLibrary` 接口。其主要功能是提供一种管理标签（Tag）的机制，允许开发人员配置和存储标签数据。
+
+#### 在系统/项目中的角色和重要性
+`TagLibrary` 类在Unity项目中扮演标签管理器的角色，通常用于需要对游戏对象或资源进行分类和标记的场景。它是可配置的脚本对象，允许通过Unity编辑器创建和管理标签集合，具有较高的灵活性和可维护性。
+
+#### 支持的主要特性与技术实现方案
+- **标签管理**：通过 `string[] tags` 数组存储标签数据。
+- **配置能力**：继承自 `ScriptableObject`，可以通过Unity编辑器直接配置。
+- **接口实现**：实现 `ITagLibrary` 接口，提供统一的标签访问方式。
+
+---
+
+### 2. 核心类解析
+
+#### `TagLibrary` 类
+
+- **职责说明**：该类用于存储和管理标签数据，提供对标签的访问接口。
+- **关键方法清单**：
+  - `public string Tags => tags;`（读取属性）
+- **继承关系**：
+  ```mermaid
+  classDiagram
+    TagLibrary --> ScriptableObject
+    ScriptableObject --> MonoBehaviour
+    MonoBehaviour --> Component
+    Component --> Object
+  ```
+- **依赖模块**：无直接依赖项，仅依赖Unity内置类型和接口。
+
+---
+
+### 3. 关键方法详解
+
+#### 方法：`public string Tags => tags;`
+
+- **方法签名**：`public string Tags { get; }`
+- **功能描述**：该方法返回一个字符串数组 `tags`，表示所有可用的标签。这是一个只读属性，确保标签数据在运行时不可修改。
+- **算法说明**：直接返回预先配置的 `tags` 数组，逻辑简单，属于直接访问类型。
+- **调用关系**：通常会被其他需要使用标签的类（如 `TagManager` 或 `GameObject`）调用，调用频率取决于具体使用场景，可能在初始化或运行时频繁调用。
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+  class TagLibrary {
+    +string category
+    +string[] tags
+    +string Tags { get; }
+  }
+  TagLibrary --> ScriptableObject
+  TagLibrary implements ITagLibrary
+  class ScriptableObject
+  class ITagLibrary {
+    +string Tags { get; }
+  }
+```
+
+---
+
+### 总结
+`TagLibrary` 是一个轻量级的标签管理类，通过Unity的 `ScriptableObject` 机制提供配置能力和数据持久化功能。它实现了 `ITagLibrary` 接口，确保了代码的可扩展性和可测试性。其核心功能是提供对标签数据的访问，适用于需要对对象进行分类和标记的场景。

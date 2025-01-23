@@ -1,0 +1,466 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEditor;
+
+using UnityEngine;
+using TMPro;
+using System.Text;
+using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System;
+using System.Reflection;
+using PartyIP.AssetExport;
+
+/// <summary>
+/// 购买记录里的更新逻辑，完成二次导出用的。放在了购物记录的导出按钮上
+/// </summary>
+public class PurchaseRecordUpdater : MonoBehaviour
+{
+    public Button savePurchaseRecordButton; // 插槽：用于保存购买记录的按钮
+    public Transform contentParent; // 插槽：用于获取Content Parent中的资源卡
+    public GameObject title; // 插槽：用于显示标题
+    public ResourceManager resourceManager; // 插槽：用于获取ResourceManager实例
+
+    private const string CsvHeader = "资源ID,资源名称,资源描述,物品高度,预制体路径,缩略图路径,面数,创建时间,更新时间,版本,类型标签,主题标签,功能标签,区域标签,批次标签,属性标签";
+    private EditorWindow m_ExportWindow = null;
+    private Type m_ExportWindowType = null;
+    public GameObject pathAddFailedUI; // 插槽：用于显示路径添加失败消息的UI
+
+    private void Start()
+    {
+        if (savePurchaseRecordButton != null)
+        {
+            savePurchaseRecordButton.onClick.AddListener(UpdatePurchaseRecord);
+        }
+
+        if (title != null)
+        {
+            title.SetActive(false); // 确保初始状态是隐藏的
+        }
+
+        // 初始化时打开AssetExportWindow（仅在编辑器中）
+#if UNITY_EDITOR
+        OpenAssetExportWindow();
+#endif
+    }
+
+#if UNITY_EDITOR
+    private void OpenAssetExportWindow()
+    {
+        EditorApplication.delayCall += () =>
+        {
+            m_ExportWindow = EditorWindow.GetWindow(GetExportWindowType());
+        };
+    }
+
+    private Type GetExportWindowType()
+    {
+        if (m_ExportWindowType != null)
+        {
+            return m_ExportWindowType;
+        }
+
+        Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        Assembly target = null;
+        foreach (var assembly in assemblies)
+        {
+            string name = assembly.FullName.ToLower().Replace("-", "").Replace(".", "");
+            if (name.Contains("assetexport"))
+            {
+                target = assembly;
+                break;
+            }
+        }
+
+        if (target != null)
+        {
+            m_ExportWindowType = target.GetType("PartyIP.AssetExport.AssetExportWindow");
+        }
+
+        return m_ExportWindowType;
+    }
+
+    private bool AddPathToExportWindow(string path)
+    {
+        if (m_ExportWindow == null)
+        {
+            Debug.LogError("导出窗口没打开");
+            return false;
+        }
+
+        var IAddPathFunc = m_ExportWindowType.GetMethod("AddPath");
+        try
+        {
+            string error = (string)IAddPathFunc.Invoke((object)m_ExportWindow, new object[] { path, true, true });
+            if (string.IsNullOrEmpty(error))
+            {
+                Debug.Log("路径添加成功");
+                return true;
+            }
+            else
+            {
+                Debug.LogError($"路径添加失败: {error}");
+                ShowPathAddFailed(path); // 显示路径添加失败消息的UI
+                return false;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"报错: {e.InnerException.Message}");
+            ShowPathAddFailed(path); // 显示路径添加失败消息的UI
+            return false;
+        }
+    }
+#endif
+
+    private void UpdatePurchaseRecord()
+    {
+        List<CardInfo> cardInfos = new List<CardInfo>();
+
+        foreach (Transform child in contentParent)
+        {
+            SelectedCardUI cardUI = child.GetComponent<SelectedCardUI>();
+            if (cardUI != null)
+            {
+                // 获取资源信息
+                ResourceCardData resourceData = resourceManager.GetResourceById(cardUI.idText.text);
+                if (resourceData != null)
+                {
+                    CardInfo card = new CardInfo(
+                        resourceData.ID,
+                        resourceData.Name,
+                        resourceData.Description,
+                        resourceData.Height,
+                        resourceData.PrefabPath,
+                        resourceData.ThumbnailPath,
+                        resourceData.ModelFaces,
+                        resourceData.CreationDate,
+                        resourceData.UpdatedDate,
+                        resourceData.Version,
+                        string.Join(";", resourceData.TypeTags),
+                        string.Join(";", resourceData.ThemeTags),
+                        string.Join(";", resourceData.FunctionTags),
+                        string.Join(";", resourceData.DefinitionTags),
+                        string.Join(";", resourceData.BatchTags),
+                        string.Join(";", resourceData.PropertyTags)
+                    );
+                    cardInfos.Add(card);
+                }
+            }
+        }
+
+        string userKey = PlayerPrefs.GetString("currentUserKey", string.Empty);
+        if (!string.IsNullOrEmpty(userKey))
+        {
+            string folderPath = Path.Combine(Application.dataPath, "ZTResource/UserInfo");
+            string fileName = userKey + ".csv";
+            string filePath = Path.Combine(folderPath, fileName);
+
+            UpdatePurchaseRecordFile(cardInfos, filePath);
+
+            if (title != null)
+            {
+                title.SetActive(true); // 显示标题
+                StartCoroutine(HideTitleAfterSeconds(3)); // 3秒后隐藏标题
+            }
+
+            // 强制刷新Unity的资源数据库（仅在编辑器中）
+#if UNITY_EDITOR
+            UnityEditor.AssetDatabase.Refresh();
+#endif
+
+            // 购买成功，调用CustomEventSystem.RaiseAddPrefabPath（仅在编辑器中）
+#if UNITY_EDITOR
+            foreach (var card in cardInfos)
+            {
+                if (!AddPathToExportWindow(card.PrefabPath))
+                {
+                    ShowPathAddFailed(card.PrefabPath); // 显示路径添加失败消息的UI
+                    return;
+                }
+            }
+#endif
+
+            CopyAllPrefabPathsToClipboard(); // 复制路径到剪贴板
+        }
+    }
+
+    private void UpdatePurchaseRecordFile(List<CardInfo> cardInfos, string filePath)
+    {
+        if (cardInfos == null || cardInfos.Count == 0) return;
+
+        List<string> lines = new List<string>(File.ReadAllLines(filePath, Encoding.UTF8));
+        Dictionary<string, string> updatedRecords = new Dictionary<string, string>();
+
+        foreach (var card in cardInfos)
+        {
+            string line = $"{card.ID},{card.Name},{card.Description},{card.Height},{card.PrefabPath},{card.ThumbnailPath},{card.ModelFaces},{card.CreationDate},{card.UpdatedDate},{card.Version},{card.TypeTags},{card.ThemeTags},{card.FunctionTags},{card.DefinitionTags},{card.BatchTags},{card.PropertyTags}";
+            updatedRecords[card.ID] = line;
+        }
+
+        for (int i = 3; i < lines.Count; i++) // 从第四行开始读取数据
+        {
+            string[] values = lines[i].Split(',');
+            if (values.Length > 0 && updatedRecords.ContainsKey(values[0]))
+            {
+                lines[i] = updatedRecords[values[0]];
+                updatedRecords.Remove(values[0]);
+            }
+        }
+
+        // 添加新的记录
+        foreach (var record in updatedRecords.Values)
+        {
+            lines.Add(record);
+        }
+
+        File.WriteAllLines(filePath, lines, Encoding.UTF8);
+    }
+
+    private void CopyAllPrefabPathsToClipboard()
+    {
+        StringBuilder paths = new StringBuilder();
+        foreach (Transform child in contentParent)
+        {
+            SelectedCardUI cardUI = child.GetComponent<SelectedCardUI>();
+            if (cardUI != null && cardUI.prefabPathText != null)
+            {
+                TextMeshProUGUI tmpText = cardUI.prefabPathText.GetComponent<TextMeshProUGUI>();
+                if (tmpText != null)
+                {
+                    paths.AppendLine(tmpText.text);
+                }
+            }
+        }
+        GUIUtility.systemCopyBuffer = paths.ToString();
+    }
+
+    IEnumerator HideTitleAfterSeconds(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        if (title != null)
+        {
+            title.SetActive(false);
+        }
+    }
+
+    private void ShowPathAddFailed(string failedPath)
+    {
+        foreach (Transform child in contentParent)
+        {
+            SelectedCardUI cardUI = child.GetComponent<SelectedCardUI>();
+            if (cardUI != null && cardUI.prefabPathText.text == failedPath)
+            {
+                cardUI.SetPathErrorUIVisibility(true); // 显示路径错误UI
+            }
+        }
+
+        if (pathAddFailedUI != null)
+        {
+            pathAddFailedUI.SetActive(true); // 显示路径添加失败消息的UI
+        }
+    }
+}
+#endif
+源代码内容解释如下：
+```markdown
+# 代码文件分析报告
+
+## 1. 功能概览
+
+### 功能定位
+该代码文件定义了一个名为 `PurchaseRecordUpdater` 的类，主要用于处理购买记录的更新逻辑。它通过按钮点击事件触发更新操作，收集并存储资源信息到 CSV 文件中，并与 Unity 编辑器中的资产导出窗口进行交互。
+
+### 系统角色
+`PurchaseRecordUpdater` 在系统中主要承担以下角色：
+- **数据收集与存储**：收集资源信息并存储到 CSV 文件，便于后续处理。
+- **编辑器扩展**：与 Unity 编辑器的资产导出功能集成，自动添加资源路径到导出窗口。
+- **用户反馈**：通过 UI 提供操作反馈，如显示成功或失败消息。
+
+### 主要特性与技术实现
+- **CSV 文件操作**：读写 CSV 文件以存储和更新购买记录。
+- **反射机制**：通过反射访问和调用 `AssetExportWindow` 的方法。
+- **UI 交互**：控制按钮点击事件、标题显示和错误提示 UI 的显示。
+- **资源管理**：通过 `ResourceManager` 获取资源数据，并处理资源路径的复制和导出。
+
+## 2. 核心类解析
+
+### 类名称：`PurchaseRecordUpdater`
+
+#### 职责说明
+`PurchaseRecordUpdater` 的主要职责包括：
+- 处理购买记录的更新逻辑。
+- 管理与资产导出窗口的交互。
+- 提供用户操作反馈。
+
+#### 关键方法清单
+- `void Start()`：初始化按钮点击事件和导出窗口。
+- `void UpdatePurchaseRecord()`：收集资源信息并更新购买记录。
+- `void UpdatePurchaseRecordFile(List<CardInfo> cardInfos, string filePath)`：更新 CSV 文件。
+- `void CopyAllPrefabPathsToClipboard()`：复制资源路径到剪贴板。
+- `void ShowPathAddFailed(string failedPath)`：显示路径添加失败的提示。
+
+#### 继承关系
+```
+PurchaseRecordUpdater -> MonoBehaviour
+```
+
+#### 依赖模块
+- `UnityEngine.UI.Button`
+- `UnityEngine.Transform`
+- `UnityEngine.GameObject`
+- `PartyIP.AssetExport.ResourceManager`
+- `PartyIP.AssetExport.AssetExportWindow`（通过反射访问）
+
+## 3. 关键方法详解
+
+### 方法：`void Start()`
+
+#### 方法签名
+```csharp
+private void Start()
+```
+
+#### 功能描述
+初始化按钮点击事件，设置标题初始状态为隐藏，并在 Unity 编辑器环境中打开资产导出窗口。
+
+#### 算法说明
+- 检查按钮是否有效，若有效则添加点击事件监听器。
+- 检查标题是否有效，若有效则设置为隐藏。
+- 在 Unity 编辑器环境中调用 `OpenAssetExportWindow()` 方法打开导出窗口。
+
+#### 调用关系
+- 由 Unity 引擎在脚本实例化时自动调用。
+- 调用 `UpdatePurchaseRecord()` 方法处理点击事件。
+
+### 方法：`void UpdatePurchaseRecord()`
+
+#### 方法签名
+```csharp
+private void UpdatePurchaseRecord()
+```
+
+#### 功能描述
+收集当前显示的资源信息，更新购买记录 CSV 文件，并与资产导出窗口交互。
+
+#### 算法说明
+1. 遍历 `contentParent` 下的所有子节点，获取每个资源的 `SelectedCardUI` 组件。
+2. 使用 `ResourceManager` 获取资源数据，并构建 `CardInfo` 对象。
+3. 将所有 `CardInfo` 对象传递给 `UpdatePurchaseRecordFile` 方法，更新 CSV 文件。
+4. 显示标题 3 秒后隐藏。
+5. 在 Unity 编辑器环境中，尝试将每个资源的Prefab路径添加到导出窗口。
+6. 复制所有Prefab路径到剪贴板。
+
+#### 调用关系
+- 由 `savePurchaseRecordButton` 的点击事件调用。
+- 调用 `UpdatePurchaseRecordFile()`、`HideTitleAfterSeconds()` 和 `AddPathToExportWindow()` 方法。
+
+### 方法：`void UpdatePurchaseRecordFile(List<CardInfo> cardInfos, string filePath)`
+
+#### 方法签名
+```csharp
+private void UpdatePurchaseRecordFile(List<CardInfo> cardInfos, string filePath)
+```
+
+#### 功能描述
+更新指定路径的 CSV 文件，将新的资源记录与现有记录进行合并。
+
+#### 算法说明
+1. 读取现有 CSV 文件内容到 `lines` 列表中。
+2. 遍历 `cardInfos`，构建新的资源记录并存储在 `updatedRecords` 字典中。
+3. 从第四行开始，逐行检查现有记录，若存在对应资源ID则更新记录。
+4. 将未更新的记录添加到文件末尾。
+5. 将更新后的内容写回 CSV 文件。
+
+#### 调用关系
+- 由 `UpdatePurchaseRecord()` 方法调用。
+
+### 方法：`void CopyAllPrefabPathsToClipboard()`
+
+#### 方法签名
+```csharp
+private void CopyAllPrefabPathsToClipboard()
+```
+
+#### 功能描述
+复制所有资源的Prefab路径到剪贴板，便于后续粘贴使用。
+
+#### 算法说明
+1. 遍历 `contentParent` 下的所有子节点，获取每个资源的 `SelectedCardUI` 组件。
+2. 提取 `prefabPathText` 的文本内容，构建多行字符串。
+3. 使用 `GUIUtility.systemCopyBuffer` 将字符串复制到剪贴板。
+
+#### 调用关系
+- 由 `UpdatePurchaseRecord()` 方法调用。
+
+### 方法：`void ShowPathAddFailed(string failedPath)`
+
+#### 方法签名
+```csharp
+private void ShowPathAddFailed(string failedPath)
+```
+
+#### 功能描述
+显示指定路径添加失败的提示信息。
+
+#### 算法说明
+1. 遍历 `contentParent` 下的所有子节点，查找对应 `failedPath` 的 `SelectedCardUI` 组件。
+2. 显示该资源的路径错误 UI。
+3. 显示全局的路径添加失败提示 UI。
+
+#### 调用关系
+- 由 `AddPathToExportWindow()` 方法在路径添加失败时调用。
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+    class PurchaseRecordUpdater {
+        +Button savePurchaseRecordButton
+        +Transform contentParent
+        +GameObject title
+        +ResourceManager resourceManager
+        +GameObject pathAddFailedUI
+        +void Start()
+        +void UpdatePurchaseRecord()
+        +void UpdatePurchaseRecordFile(List<CardInfo> cardInfos, string filePath)
+        +void CopyAllPrefabPathsToClipboard()
+        +void ShowPathAddFailed(string failedPath)
+        +IEnumerator HideTitleAfterSeconds(float seconds)
+    }
+
+    class MonoBehaviour {
+        +void Start()
+        +void Update()
+    }
+
+    class Button {
+        +Button.onClick
+    }
+
+    class Transform {}
+
+    class GameObject {}
+
+    class ResourceManager {
+        +ResourceData GetResourceById(string id)
+    }
+
+    class AssetExportWindow {
+        +void AddPath(string path, bool includeChildren, bool recursive)
+    }
+
+    PurchaseRecordUpdater --> MonoBehaviour : inherits from
+    PurchaseRecordUpdater --> Button : uses
+    PurchaseRecordUpdater --> Transform : uses
+    PurchaseRecordUpdater --> GameObject : uses
+    PurchaseRecordUpdater --> ResourceManager : uses
+    PurchaseRecordUpdater --> AssetExportWindow : uses via reflection
+```
+
+## 5. 总结
+
+`PurchaseRecordUpdater` 类通过与 Unity 编辑器的交互，实现了购买记录的更新、CSV 文件的管理以及用户反馈功能。其核心在于反射机制的使用和对资源数据的高效处理，确保了与现有资产导出系统的无缝集成。

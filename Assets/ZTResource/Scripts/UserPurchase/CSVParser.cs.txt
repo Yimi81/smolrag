@@ -1,0 +1,422 @@
+文件源代码内容如下：
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using UnityEngine;
+
+public class CSVParser : MonoBehaviour
+{
+    public static (string userName, string userAvatar, List<(string batchName, string batchTime, List<CardInfo> cardInfos)> batches) ParseCSV(string filePath)
+    {
+        List<(string batchName, string batchTime, List<CardInfo> cardInfos)> batchList = new List<(string batchName, string batchTime, List<CardInfo> cardInfos)>();
+        string userName = string.Empty;
+        string userAvatar = string.Empty;
+
+        if (!File.Exists(filePath))
+        {
+            Debug.LogError("CSV file not found: " + filePath);
+            return (userName, userAvatar, batchList);
+        }
+
+        string[] lines = File.ReadAllLines(filePath, Encoding.UTF8);
+
+        // 解析用户名称和用户头像
+        if (lines.Length > 1)
+        {
+            string[] userInfo = lines[1].Split(',');
+            if (userInfo.Length >= 2)
+            {
+                userName = userInfo[0];
+                userAvatar = userInfo[1];
+            }
+        }
+
+        string currentBatchName = string.Empty;
+        string currentBatchTime = string.Empty;
+        List<CardInfo> currentBatchCards = new List<CardInfo>();
+
+        for (int i = 3; i < lines.Length; i++)
+        {
+            string[] data = lines[i].Split(',');
+
+            if (data[0].StartsWith("批次"))
+            {
+                // 如果已有当前批次信息，添加到列表中
+                if (!string.IsNullOrEmpty(currentBatchName) || !string.IsNullOrEmpty(currentBatchTime) || currentBatchCards.Count > 0)
+                {
+                    batchList.Add((currentBatchName, currentBatchTime, currentBatchCards));
+                }
+
+                if (data.Length > 2)
+                {
+                    currentBatchName = data[1]; // 批次名称在"批次"后面一格，允许为空
+                    currentBatchTime = data[2]; // 批次时间在第三格
+                }
+                currentBatchCards = new List<CardInfo>();
+            }
+            else if (data.Length >= 16)
+            {
+                CardInfo card = new CardInfo(
+                    data[0], // ID
+                    data[1], // Name
+                    data[2], // Description
+                    data[3], // Height
+                    data[4], // PrefabPath
+                    data[5], // ThumbnailPath
+                    data[6], // ModelFaces
+                    data[7], // CreationDate
+                    data[8], // UpdatedDate
+                    data[9], // Version
+                    data[10], // TypeTags
+                    data[11], // ThemeTags
+                    data[12], // FunctionTags
+                    data[13], // DefinitionTags
+                    data[14], // BatchTags
+                    data[15]  // PropertyTags
+                );
+
+                currentBatchCards.Add(card);
+            }
+            else
+            {
+                Debug.LogWarning("Incorrect data format in line: " + i);
+            }
+        }
+
+        // 处理最后一个批次
+        if (!string.IsNullOrEmpty(currentBatchName) || !string.IsNullOrEmpty(currentBatchTime) || currentBatchCards.Count > 0)
+        {
+            batchList.Add((currentBatchName, currentBatchTime, currentBatchCards));
+        }
+
+        return (userName, userAvatar, batchList);
+    }
+
+
+
+    public static void DeleteResource(string filePath, string resourceId)
+    {
+        List<string> lines = new List<string>(File.ReadAllLines(filePath, Encoding.UTF8));
+        lines.RemoveAll(line => line.Contains(resourceId));
+        File.WriteAllLines(filePath, lines, Encoding.UTF8);
+    }
+
+    public static void DeleteBatch(string filePath, string batchTime)
+    {
+        List<string> lines = new List<string>(File.ReadAllLines(filePath, Encoding.UTF8));
+        bool inBatch = false;
+        bool batchFound = false;
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].StartsWith("批次") && lines[i].Contains(batchTime))
+            {
+                inBatch = true;
+                batchFound = true;
+            }
+
+            if (inBatch)
+            {
+                lines.RemoveAt(i);
+                i--; // 调整索引以便正确删除连续的行
+
+                // 检查是否是下一个批次的开始，如果是则停止删除
+                if (i + 1 < lines.Count && lines[i + 1].StartsWith("批次"))
+                {
+                    inBatch = false;
+                }
+            }
+        }
+
+        if (batchFound)
+        {
+            File.WriteAllLines(filePath, lines, Encoding.UTF8);
+        }
+        else
+        {
+            Debug.LogWarning("Batch not found: " + batchTime);
+        }
+    }
+
+
+    public static void RenameBatch(string filePath, string oldBatchTime, string newBatchName)
+    {
+        List<string> lines = new List<string>(File.ReadAllLines(filePath, Encoding.UTF8));
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].StartsWith("批次") && lines[i].Contains(oldBatchTime))
+            {
+                string[] parts = lines[i].Split(',');
+                if (parts.Length > 2 && parts[2] == oldBatchTime)
+                {
+                    parts[1] = newBatchName;
+                    lines[i] = string.Join(",", parts);
+                }
+            }
+        }
+
+        File.WriteAllLines(filePath, lines, Encoding.UTF8);
+    }
+    public static bool ResourceExistsInBatch(string filePath, string resourceId, string targetBatchTime)
+    {
+        List<string> lines = new List<string>(File.ReadAllLines(filePath, Encoding.UTF8));
+        bool inTargetBatch = false;
+
+        foreach (string line in lines)
+        {
+            if (line.StartsWith("批次") && line.Contains(targetBatchTime))
+            {
+                inTargetBatch = true;
+            }
+            else if (line.StartsWith("批次"))
+            {
+                inTargetBatch = false;
+            }
+
+            if (inTargetBatch && line.Contains(resourceId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    public static void DeleteResourceInBatch(string filePath, string resourceId, string batchTime)
+    {
+        List<string> lines = new List<string>(File.ReadAllLines(filePath, Encoding.UTF8));
+        bool inTargetBatch = false;
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].StartsWith("批次") && lines[i].Contains(batchTime))
+            {
+                inTargetBatch = true;
+            }
+            else if (lines[i].StartsWith("批次"))
+            {
+                inTargetBatch = false;
+            }
+
+            if (inTargetBatch && lines[i].Contains(resourceId))
+            {
+                lines.RemoveAt(i);
+                break;
+            }
+        }
+
+        File.WriteAllLines(filePath, lines, Encoding.UTF8);
+    }
+    public static void MoveResourceToBatch(string filePath, string resourceId, string targetBatchTime)
+    {
+        List<string> lines = new List<string>(File.ReadAllLines(filePath, Encoding.UTF8));
+        string resourceLine = lines.Find(line => line.Contains(resourceId) && !line.StartsWith("批次"));
+        lines.Remove(resourceLine);
+
+        int targetBatchIndex = lines.FindIndex(line => line.StartsWith("批次") && line.Contains(targetBatchTime));
+        if (targetBatchIndex != -1)
+        {
+            int insertIndex = targetBatchIndex + 1;
+            while (insertIndex < lines.Count && !lines[insertIndex].StartsWith("批次"))
+            {
+                insertIndex++;
+            }
+            lines.Insert(insertIndex, resourceLine);
+        }
+
+        File.WriteAllLines(filePath, lines, Encoding.UTF8);
+    }
+
+}
+源代码内容解释如下：
+### 1. 功能概览
+
+- **功能定位**：`CSVParser` 类主要用于解析和操作 CSV 文件中的用户信息和批次数据。它能够读取 CSV 文件，提取用户名称、用户头像以及多个批次的信息，每个批次包含卡片信息。此外，该类还支持删除资源、删除批次、重命名批次、检查资源是否存在、删除特定批次中的资源以及将资源移动到其他批次。
+
+- **在系统中的角色和重要性**：在 Unity 项目中，该类作为数据处理的核心组件，负责 CSV 文件的解析和操作，为其他模块提供数据支持。它通过解析 CSV 文件，提取结构化数据，便于其他模块进行处理和展示。
+
+- **主要特性与技术实现方案**：
+  - **CSV 解析**：使用 `File.ReadAllLines` 读取 CSV 文件，并通过 `Split` 方法解析每一行的数据。
+  - **数据结构**：使用元组和自定义类 `CardInfo` 来存储用户和卡片信息。
+  - **文件操作**：通过 `File.WriteAllLines` 方法实现对 CSV 文件的写入操作。
+  - **异常处理**：使用 `Debug.LogError` 和 `Debug.LogWarning` 提供错误和警告信息。
+
+### 2. 核心类解析
+
+#### `CSVParser`
+
+- **职责说明**：该类主要用于解析 CSV 文件，提取用户信息和批次数据，并提供对 CSV 文件的增删改查操作。
+
+- **关键方法清单**：
+  - `public static (string userName, string userAvatar, List<(string batchName, string batchTime, List<CardInfo> cardInfos)> batches) ParseCSV(string filePath)`
+  - `public static void DeleteResource(string filePath, string resourceId)`
+  - `public static void DeleteBatch(string filePath, string batchTime)`
+  - `public static void RenameBatch(string filePath, string oldBatchTime, string newBatchName)`
+  - `public static bool ResourceExistsInBatch(string filePath, string resourceId, string targetBatchTime)`
+  - `public static void DeleteResourceInBatch(string filePath, string resourceId, string batchTime)`
+  - `public static void MoveResourceToBatch(string filePath, string resourceId, string targetBatchTime)`
+
+- **继承关系**：
+  ```
+  CSVParser -> MonoBehaviour
+  ```
+
+- **依赖模块**：
+  - `UnityEngine` 命名空间中的类。
+  - `System.Collections.Generic` 命名空间中的 `List<T>` 和 `Tuple`。
+  - `System.IO` 命名空间中的文件操作类。
+  - `System.Text` 命名空间中的 `Encoding`。
+  - 项目内的 `CardInfo` 类。
+
+### 3. 关键方法详解
+
+#### `ParseCSV` 方法
+
+- **方法签名**：
+  ```csharp
+  public static (string userName, string userAvatar, List<(string batchName, string batchTime, List<CardInfo> cardInfos)> batches) ParseCSV(string filePath)
+  ```
+
+- **功能描述**：该方法读取指定路径的 CSV 文件，解析其中的用户信息和批次数据，并返回一个包含用户名、用户头像和批次列表的元组。
+
+- **算法说明**：
+  1. 检查文件是否存在，如果不存在则返回空值。
+  2. 读取文件的所有行。
+  3. 解析用户信息（用户名和用户头像）。
+  4. 逐行解析文件内容，识别批次信息和卡片信息。
+  5. 将解析的批次信息和卡片信息存储在列表中，并最终返回。
+
+- **调用关系**：该方法可能被其他需要解析 CSV 文件的模块调用，频率较高。
+
+#### `DeleteResource` 方法
+
+- **方法签名**：
+  ```csharp
+  public static void DeleteResource(string filePath, string resourceId)
+  ```
+
+- **功能描述**：该方法通过移除包含指定资源 ID 的行来删除 CSV 文件中的资源。
+
+- **算法说明**：
+  1. 读取文件的所有行。
+  2. 移除包含指定资源 ID 的行。
+  3. 将修改后的内容写回文件。
+
+- **调用关系**：可能在需要删除资源的场景中被调用，频率适中。
+
+#### `DeleteBatch` 方法
+
+- **方法签名**：
+  ```csharp
+  public static void DeleteBatch(string filePath, string batchTime)
+  ```
+
+- **功能描述**：该方法删除 CSV 文件中指定批次及其相关资源。
+
+- **算法说明**：
+  1. 读取文件的所有行。
+  2. 逐行检查，识别出指定批次及其资源，并移除这些行。
+  3. 将修改后的内容写回文件。
+
+- **调用关系**：可能在需要删除批次的场景中被调用，频率适中。
+
+#### `RenameBatch` 方法
+
+- **方法签名**：
+  ```csharp
+  public static void RenameBatch(string filePath, string oldBatchTime, string newBatchName)
+  ```
+
+- **功能描述**：该方法将 CSV 文件中指定批次的名称修改为新的名称。
+
+- **算法说明**：
+  1. 读取文件的所有行。
+  2. 找到指定批次的行，修改其名称。
+  3. 将修改后的内容写回文件。
+
+- **调用关系**：可能在需要重命名批次的场景中被调用，频率较低。
+
+#### `ResourceExistsInBatch` 方法
+
+- **方法签名**：
+  ```csharp
+  public static bool ResourceExistsInBatch(string filePath, string resourceId, string targetBatchTime)
+  ```
+
+- **功能描述**：该方法检查指定资源是否存在于指定批次中。
+
+- **算法说明**：
+  1. 读取文件的所有行。
+  2. 逐行检查，判断资源是否存在于目标批次中。
+
+- **调用关系**：可能在需要验证资源存在性的场景中被调用，频率较高。
+
+#### `DeleteResourceInBatch` 方法
+
+- **方法签名**：
+  ```csharp
+  public static void DeleteResourceInBatch(string filePath, string resourceId, string batchTime)
+  ```
+
+- **功能描述**：该方法删除指定批次中的指定资源。
+
+- **算法说明**：
+  1. 读取文件的所有行。
+  2. 在目标批次中找到指定资源并移除。
+  3. 将修改后的内容写回文件。
+
+- **调用关系**：可能在需要删除批次中资源的场景中被调用，频率适中。
+
+#### `MoveResourceToBatch` 方法
+
+- **方法签名**：
+  ```csharp
+  public static void MoveResourceToBatch(string filePath, string resourceId, string targetBatchTime)
+  ```
+
+- **功能描述**：该方法将指定资源移动到指定批次中。
+
+- **算法说明**：
+  1. 读取文件的所有行。
+  2. 找到指定资源并将其从当前批次移除。
+  3. 将资源添加到目标批次中。
+  4. 将修改后的内容写回文件。
+
+- **调用关系**：可能在需要移动资源的场景中被调用，频率适中。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class CSVParser {
+        +public static ParseCSV(filePath: string): (userName: string, userAvatar: string, batches: List<(batchName: string, batchTime: string, cardInfos: List<CardInfo>)>)
+        +public static DeleteResource(filePath: string, resourceId: string)
+        +public static DeleteBatch(filePath: string, batchTime: string)
+        +public static RenameBatch(filePath: string, oldBatchTime: string, newBatchName: string)
+        +public static ResourceExistsInBatch(filePath: string, resourceId: string, targetBatchTime: string): bool
+        +public static DeleteResourceInBatch(filePath: string, resourceId: string, batchTime: string)
+        +public static MoveResourceToBatch(filePath: string, resourceId: string, targetBatchTime: string)
+    }
+
+    class CardInfo {
+        +string ID
+        +string Name
+        +string Description
+        +string Height
+        +string PrefabPath
+        +string ThumbnailPath
+        +string ModelFaces
+        +string CreationDate
+        +string UpdatedDate
+        +string Version
+        +string TypeTags
+        +string ThemeTags
+        +string FunctionTags
+        +string DefinitionTags
+        +string BatchTags
+        +string PropertyTags
+    }
+
+    CSVParser --> CardInfo: 使用
+```

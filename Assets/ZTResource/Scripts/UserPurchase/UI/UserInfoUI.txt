@@ -1,0 +1,161 @@
+文件源代码内容如下：
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.IO;
+
+public class UserInfoUI : MonoBehaviour
+{
+    public Image userAvatarImage;
+    public TextMeshProUGUI userNameText;
+
+    public void SetupUserInfo(string userName, string userAvatarFileName)
+    {
+        userNameText.text = userName;
+
+        // Ê¹ÓÃResources.Load´Ó×ÊÔ´ÎÄ¼þ¼ÐÖÐ¼ÓÔØÍ¼Ïñ
+        string avatarResourcePath = "ZT_Sprites/ZT_User_Icon/" + Path.GetFileNameWithoutExtension(userAvatarFileName);
+        userAvatarImage.sprite = Resources.Load<Sprite>(avatarResourcePath);
+
+        if (userAvatarImage.sprite == null)
+        {
+            Debug.LogError("Failed to load avatar sprite from Resources at path: " + avatarResourcePath);
+        }
+    }
+
+#if UNITY_EDITOR
+    private Sprite LoadSpriteFromFile(string filePath)
+    {
+        if (!System.IO.File.Exists(filePath))
+        {
+            Debug.LogError("File not found at path: " + filePath);
+            return null;
+        }
+
+        byte[] fileData = System.IO.File.ReadAllBytes(filePath);
+        Texture2D tex = new Texture2D(2, 2);
+        if (tex.LoadImage(fileData))
+        {
+            return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+        }
+        else
+        {
+            Debug.LogError("Failed to load texture from file: " + filePath);
+            return null;
+        }
+    }
+#endif
+}
+
+源代码内容解释如下：
+### 功能概览
+
+#### 功能定位
+该代码文件`UserInfoUI.cs`是一个Unity脚本，用于在用户界面上显示用户信息，包括用户名和用户头像。它通过绑定UI元素（如`Image`和`TextMeshProUGUI`）来实现用户信息的展示。
+
+#### 系统角色
+该脚本属于用户界面（UI）模块，负责将用户数据（如用户名和头像）呈现给用户。在项目中，它是一个重要的展示层组件，用于增强用户体验。
+
+#### 主要特性与技术实现
+- **用户信息展示**：通过绑定UI元素展示用户名和用户头像。
+- **资源加载**：使用`Resources.Load`从`Resources`文件夹加载头像Sprite。
+- **开发环境支持**：在Unity编辑器环境下，支持从文件系统加载头像文件并转换为Sprite（通过`LoadSpriteFromFile`方法实现）。
+
+### 核心类解析
+
+#### `UserInfoUI` 类
+- **职责说明**
+  - 管理用户信息的显示，包括用户名和用户头像。
+  - 提供从`Resources`文件夹加载用户头像的功能。
+  - 在Unity编辑器环境下，提供从文件系统加载头像文件的功能。
+
+- **关键方法清单**
+  - `public void SetupUserInfo(string userName, string userAvatarFileName)`
+  - `private Sprite LoadSpriteFromFile(string filePath)`（仅在Unity编辑器环境下有效）
+
+- **继承关系**
+  ```
+ UserInfoUI -> MonoBehaviour -> Component -> Object
+  ```
+
+- **依赖模块**
+  - `UnityEngine.UI.Image`
+  - `TextMeshProUGUI`
+  - `UnityEngine.Resources`
+
+### 关键方法详解
+
+#### `public void SetupUserInfo(string userName, string userAvatarFileName)`
+- **方法签名**
+  ```csharp
+  public void SetupUserInfo(string userName, string userAvatarFileName)
+  ```
+
+- **功能描述**
+  - 设置用户信息，包括用户名和用户头像。
+  - 从`Resources`文件夹加载用户头像Sprite，并验证加载是否成功。
+
+- **算法说明**
+  - 从`Resources`文件夹加载头像Sprite，路径基于`userAvatarFileName`生成。
+  - 如果加载失败，记录错误信息。
+
+- **调用关系**
+  - 通常由其他组件（如用户管理系统）调用，用于更新用户界面。
+  - 在开发环境中，可能由测试脚本调用来测试不同头像。
+
+#### `private Sprite LoadSpriteFromFile(string filePath)`
+- **方法签名**
+  ```csharp
+  private Sprite LoadSpriteFromFile(string filePath)
+  ```
+
+- **功能描述**
+  - 从指定文件路径加载图片文件，并将其转换为Sprite。
+  - 仅在Unity编辑器环境下有效。
+
+- **算法说明**
+  - 读取文件内容并转换为`Texture2D`。
+  - 使用`Texture2D`创建Sprite对象。
+
+- **调用关系**
+  - 仅在`SetupUserInfo`中调用，用于从文件系统加载头像。
+  - 仅在Unity编辑器环境下有效。
+
+### 架构关系图
+
+```mermaid
+classDiagram
+    class MonoBehaviour {
+        +string name
+    }
+    class Component {
+        +Transform transform
+    }
+    class Object {
+        +intGetInstanceID()
+    }
+    class Image {
+        +Sprite sprite
+    }
+    class TextMeshProUGUI {
+        +string text
+    }
+    class Sprite {
+        +Texture2D texture
+    }
+    class Texture2D {
+        +int width
+        +int height
+    }
+    class UserInfoUI {
+        +Image userAvatarImage
+        +TextMeshProUGUI userNameText
+        +void SetupUserInfo(string userName, string userAvatarFileName)
+        +Sprite LoadSpriteFromFile(string filePath) #if UNITY_EDITOR
+    }
+    Object <|-- Component
+    Component <|-- MonoBehaviour
+    MonoBehaviour <|--UserInfoUI
+    UserInfoUI *-- Image : userAvatarImage
+    UserInfoUI *-- TextMeshProUGUI : userNameText
+```

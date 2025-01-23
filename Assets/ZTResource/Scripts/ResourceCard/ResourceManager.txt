@@ -1,0 +1,200 @@
+文件源代码内容如下：
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO;
+using System.Globalization;
+using System.Linq;
+
+// 负责从CSV文件加载资源数据，并在游戏开始时初始化资源信息。
+public class ResourceManager : MonoBehaviour
+{
+    private List<ResourceCardData> allResources = new List<ResourceCardData>();
+
+    void Awake()
+    {
+        LoadResourceData();
+    }
+
+    void Start()
+    {
+        PrintAllResources();
+    }
+
+    private void LoadResourceData()
+    {
+        // 使用 Resources.Load 加载 CSV 文件
+        TextAsset csvFile = Resources.Load<TextAsset>("ZT_TagLibrary/ResourceIndexLibrary");
+        if (csvFile == null)
+        {
+            Debug.LogError("无法加载CSV文件，请检查文件路径和名称是否正确。");
+            return;
+        }
+
+        // 读取文件内容并分割为行
+        string[] lines = csvFile.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+        bool isFirstLine = true;
+
+        foreach (string line in lines)
+        {
+            if (isFirstLine)
+            {
+                isFirstLine = false;
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (line.StartsWith("ID")) continue;
+
+            string[] fields = line.Split(',');
+            var id = fields[0].Trim('"');
+            var name = fields[1].Trim('"');
+            var description = fields[2].Trim('"');
+            var height = fields[3].Trim('"');
+            var prefabPath = fields[4].Trim('"');
+            var thumbnailPath = fields[5].Trim('"');
+            var modelFaces = fields[6].Trim('"');
+            var creationDate = fields[7].Trim('"');
+            var updatedDate = fields[8].Trim('"');
+            var version = fields[9].Trim('"');
+            var typeTags = new List<string>(fields[10].Trim('"').Split(';').Select(tag => tag.Trim()));
+            var themeTags = new List<string>(fields[11].Trim('"').Split(';').Select(tag => tag.Trim()));
+            var functionTags = new List<string>(fields[12].Trim('"').Split(';').Select(tag => tag.Trim()));
+            var definitionTags = new List<string>(fields[13].Trim('"').Split(';').Select(tag => tag.Trim()));
+            var batchTags = new List<string>(fields[14].Trim('"').Split(';').Select(tag => tag.Trim()));
+            var propertyTags = new List<string>(fields[15].Trim('"').Split(';').Select(tag => tag.Trim()));
+
+            ResourceCardData data = new ResourceCardData(id, name, description, height, typeTags, themeTags, functionTags, definitionTags, batchTags, propertyTags, prefabPath, thumbnailPath, modelFaces, creationDate, updatedDate, version);
+            allResources.Add(data);
+        }
+    }
+
+
+    public ResourceCardData GetResourceById(string id)
+    {
+        return allResources.FirstOrDefault(resource => resource.ID == id);
+    }
+
+    public List<ResourceCardData> GetAllResources()
+    {
+        // 确保在 Start 或者其他地方初始化了 allResources
+        return allResources;
+    }
+
+    private void PrintAllResources()
+    {
+        foreach (var resource in allResources)
+        {
+            //Debug.Log($"Name: {resource.Name}, Description: {resource.Description}, Height: {resource.Height}, " +
+            //          $"Type Tags: {string.Join(", ", resource.TypeTags)}, Theme Tags: {string.Join(", ", resource.ThemeTags)}, " +
+            //          $"Function Tags: {string.Join(", ", resource.FunctionTags)}, Definition Tags: {string.Join(", ", resource.DefinitionTags)}, " +
+            //          $"Batch Tags: {string.Join(", ", resource.BatchTags)}, Property Tags: {string.Join(", ", resource.PropertyTags)}, " +
+            //          $"Prefab Path: {resource.PrefabPath}, Thumbnail Path: {resource.ThumbnailPath}, Model Faces: {resource.ModelFaces}, " +
+            //          $"Creation Date: {resource.CreationDate}, Updated Date: {resource.UpdatedDate}, Version: {resource.Version}, ID: {resource.ID}");
+        }
+    }
+}
+源代码内容解释如下：
+### 1. 功能概览
+
+#### 功能定位
+`ResourceManager` 类主要用于从 CSV 文件中加载资源数据，并在游戏启动时初始化这些资源信息。它负责解析 CSV 文件内容，将其转化为可管理的资源对象，并提供获取资源数据的方法。
+
+#### 系统角色与重要性
+该类在资源管理系统中扮演核心角色，是资源数据加载和管理的主要入口。它的主要职责是确保资源数据在游戏启动时正确加载，并为其他模块提供资源查询接口。这对于游戏中的资源管理、展示和检索功能至关重要。
+
+#### 主要特性与技术实现
+- **CSV 文件解析**：使用 `Resources.Load<TextAsset>` 加载 CSV 文件，并将其内容解析为结构化的资源对象。
+- **资源对象管理**：将解析后的资源数据存储在 `List<ResourceCardData>` 中，便于后续查询和访问。
+- **资源查询功能**：提供 `GetResourceById` 和 `GetAllResources` 方法，分别用于通过资源 ID 和获取所有资源数据。
+- **调试功能**：通过 `PrintAllResources` 方法输出资源信息，便于开发和调试。
+
+### 2. 核心类解析
+
+#### `ResourceManager` 类
+
+- **职责说明**：负责加载、解析和管理资源数据，提供资源查询接口。
+- **关键方法清单**：
+  - `void Awake()`：初始化方法，用于触发资源数据的加载。
+  - `void Start()`：在 `Awake` 之后调用，用于输出所有资源信息（调试用途）。
+  - `private void LoadResourceData()`：加载并解析 CSV 文件中的资源数据。
+  - `public ResourceCardData GetResourceById(string id)`：通过资源 ID 获取资源对象。
+  - `public List<ResourceCardData> GetAllResources()`：获取所有资源对象列表。
+  - `private void PrintAllResources()`：输出所有资源信息（调试用途）。
+- **继承关系**：
+  ```
+  ResourceManager -> MonoBehaviour
+  ```
+- **依赖模块**：
+  - `UnityEngine`：用于 `MonoBehaviour` 和 `Resources.Load`。
+  - `System.Collections.Generic`：用于 `List<T>`。
+  - `System.IO`：用于文件操作。
+  - `System.Globalization`：用于字符串操作。
+  - `System.Linq`：用于 LINQ 查询。
+  - `ResourceCardData`：资源数据对象类。
+
+### 3. 关键方法详解
+
+#### 方法 1：`void Awake()`
+
+- **方法签名**：`void Awake()`
+- **功能描述**：在 Unity 游戏对象初始化时触发，用于调用 `LoadResourceData` 方法加载资源数据。
+- **算法说明**：直接调用 `LoadResourceData`，无复杂逻辑。
+- **调用关系**：由 Unity 引擎自动调用，频率为游戏启动时一次。
+
+#### 方法 2：`void Start()`
+
+- **方法签名**：`void Start()`
+- **功能描述**：在 `Awake` 之后调用，用于调用 `PrintAllResources` 方法输出所有资源信息。
+- **算法说明**：直接调用 `PrintAllResources`，无复杂逻辑。
+- **调用关系**：由 Unity 引擎自动调用，频率为游戏启动时一次。
+
+#### 方法 3：`private void LoadResourceData()`
+
+- **方法签名**：`private void LoadResourceData()`
+- **功能描述**：加载并解析 CSV 文件中的资源数据，将其转化为 `ResourceCardData` 对象并存储在 `allResources` 列表中。
+- **算法说明**：
+  1. 使用 `Resources.Load<TextAsset>` 加载 CSV 文件。
+  2. 将 CSV 文件内容按行分割。
+  3. 跳过第一行（标题行）。
+  4. 对每一行进行字段分割和解析，生成 `ResourceCardData` 对象。
+  5. 将解析后的对象添加到 `allResources` 列表中。
+- **调用关系**：由 `Awake` 方法调用，频率为游戏启动时一次。
+
+#### 方法 4：`public ResourceCardData GetResourceById(string id)`
+
+- **方法签名**：`public ResourceCardData GetResourceById(string id)`
+- **功能描述**：通过资源 ID 在 `allResources` 列表中查找并返回对应的资源对象。
+- **算法说明**：使用 LINQ 的 `FirstOrDefault` 方法进行查找。
+- **调用关系**：由其他需要查询资源的类或方法调用，频率取决于资源查询需求。
+
+#### 方法 5：`public List<ResourceCardData> GetAllResources()`
+
+- **方法签名**：`public List<ResourceCardData> GetAllResources()`
+- **功能描述**：返回所有资源对象的列表。
+- **算法说明**：直接返回 `allResources` 列表。
+- **调用关系**：由需要获取所有资源数据的类或方法调用，频率取决于资源数据查询需求。
+
+#### 方法 6：`private void PrintAllResources()`
+
+- **方法签名**：`private void PrintAllResources()`
+- **功能描述**：遍历 `allResources` 列表并输出每条资源的详细信息。
+- **算法说明**：使用 `foreach` 循环遍历列表，使用 `Debug.Log` 输出资源信息。
+- **调用关系**：由 `Start` 方法调用，频率为游戏启动时一次。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class ResourceManager {
+        +void Awake()
+        +void Start()
+        +void LoadResourceData()
+        +ResourceCardData GetResourceById(string id)
+        +List<ResourceCardData> GetAllResources()
+        +void PrintAllResources()
+    }
+    class MonoBehaviour {
+        /* MonoBehaviour 的核心方法 */
+    }
+    ResourceManager --> MonoBehaviour
+    ResourceManager --> ResourceCardData
+```

@@ -1,0 +1,198 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+
+using UnityEditor;
+using UnityEngine;
+using System.IO;
+using System.Text;
+using System.Collections.Generic;
+
+public class CsvDuplicateRemover : ScriptableObject
+{
+    private static string rilFilePath = "Assets/ZTResource/Resources/ZT_TagLibrary/ResourceIndexLibrary.csv"; // RIL的文件路径
+
+    [MenuItem("ZTResource/Tools/CSV查重-资源库", false, 6)]
+    public static void RemoveDuplicateEntries()
+    {
+        try
+        {
+            // 读取CSV文件内容
+            string[] lines = File.ReadAllLines(rilFilePath, Encoding.UTF8);
+            if (lines.Length == 0)
+            {
+                Debug.LogWarning("CSV文件为空。");
+                return;
+            }
+
+            // 创建一个字典来存储唯一的资源条目
+            Dictionary<string, string> uniqueEntries = new Dictionary<string, string>();
+            List<string> headers = new List<string>();
+
+            // 遍历CSV文件内容
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (i == 0)
+                {
+                    // 保留表头
+                    headers.Add(lines[i]);
+                    continue;
+                }
+
+                string[] columns = lines[i].Split(',');
+                string resourceId = columns[0].Trim('\"');
+
+                // 如果字典中不包含该资源ID，则添加
+                if (!uniqueEntries.ContainsKey(resourceId))
+                {
+                    uniqueEntries.Add(resourceId, lines[i]);
+                }
+            }
+
+            // 重新生成CSV内容
+            StringBuilder csvContentBuilder = new StringBuilder();
+            foreach (var header in headers)
+            {
+                csvContentBuilder.AppendLine(header);
+            }
+            foreach (var entry in uniqueEntries.Values)
+            {
+                csvContentBuilder.AppendLine(entry);
+            }
+
+            // 写回CSV文件
+            File.WriteAllText(rilFilePath, csvContentBuilder.ToString(), Encoding.UTF8);
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("查重处理", "CSV查重处理已完成。", "确定");
+        }
+        catch (IOException ex)
+        {
+            if (IsFileLocked(ex))
+            {
+                EditorUtility.DisplayDialog("错误", "无法更新资源库，文件可能为只读或已被打开，请关闭文件后重试。", "确定");
+            }
+            else
+            {
+                throw;
+            }
+        }
+    }
+
+    private static bool IsFileLocked(IOException exception)
+    {
+        int errorCode = System.Runtime.InteropServices.Marshal.GetHRForException(exception) & ((1 << 16) - 1);
+        return errorCode == 32 || errorCode == 33;
+    }
+}
+
+#endif
+
+源代码内容解释如下：
+```markdown
+# 代码文件分析
+
+## 1. 功能概览
+
+### 功能定位
+该代码文件是一个Unity编辑器工具，用于处理CSV文件中的重复资源条目。其主要功能是从指定的CSV文件中去除重复的条目，并保留唯一的资源记录。
+
+### 在系统中的角色
+该工具在Unity项目中扮演资源管理工具的角色，特别是在处理资源库索引文件（如ResourceIndexLibrary.csv）时，确保资源条目的唯一性，避免重复条目带来的潜在问题。
+
+### 主要特性与技术实现
+- **文件操作**：读取和写入CSV文件，处理文件锁定异常。
+- **数据去重**：使用字典数据结构存储唯一资源条目。
+- **异常处理**：优雅地处理文件操作中的异常，特别是文件被锁定的情况。
+- **Unity编辑器集成**：通过Unity的编辑器扩展API（MenuItem）提供用户界面操作。
+
+---
+
+## 2. 核心类解析
+
+### `CsvDuplicateRemover`类
+
+#### 职责说明
+该类的主要职责是提供一个工具，用于从CSV文件中去除重复的资源条目。它通过读取CSV文件、存储唯一条目、重新生成文件以及处理异常来实现这一功能。
+
+#### 关键方法清单
+- `public static void RemoveDuplicateEntries()`：执行CSV文件查重和去重操作。
+- `private static bool IsFileLocked(IOException exception)`：检查文件是否被锁定。
+
+#### 继承关系
+```mermaid
+classDiagram
+    CsvDuplicateRemover --> ScriptableObject
+```
+
+#### 依赖模块
+- `UnityEngine`：用于Unity的基本功能。
+- `UnityEditor`：用于Unity编辑器扩展功能。
+- `System.IO`：用于文件操作。
+- `System.Text`：用于字符串操作。
+- `System.Collections.Generic`：用于字典数据结构。
+
+---
+
+## 3. 关键方法详解
+
+### 方法1：`RemoveDuplicateEntries()`
+
+#### 方法签名
+```csharp
+[MenuItem("ZTResource/Tools/CSV查重-资源库", false, 6)]
+public static void RemoveDuplicateEntries()
+```
+
+#### 功能描述
+该方法通过读取指定的CSV文件，去除重复的资源条目，然后将处理后的数据写回原文件。具体步骤包括：
+1. 读取CSV文件内容。
+2. 使用字典存储唯一资源条目。
+3. 重新生成CSV内容并写回文件。
+4. 处理文件锁定异常。
+
+#### 算法说明
+- 使用`Dictionary<string, string>`来存储唯一的资源条目，键为资源ID，值为完整的条目内容。
+- 遍历CSV文件的每一行，跳过表头，逐行检查资源ID是否已存在字典中。
+- 如果不存在，则将该条目添加到字典中。
+
+#### 调用关系
+该方法通过Unity的`MenuItem`属性直接调用，用户可以在Unity编辑器的菜单中点击执行。
+
+---
+
+### 方法2：`IsFileLocked(IOException exception)`
+
+#### 方法签名
+```csharp
+private static bool IsFileLocked(IOException exception)
+```
+
+#### 功能描述
+该方法用于检查给定的IO异常是否是由于文件被锁定（如被其他程序占用）引起的。
+
+#### 算法说明
+- 使用`Marshal.GetHRForException`获取异常的错误代码。
+- 检查错误代码是否为32（文件被占用）或33（文件被共享）。
+
+#### 调用关系
+该方法在`RemoveDuplicateEntries()`方法中调用，用于处理文件写入失败的异常。
+
+---
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+    CsvDuplicateRemover --> ScriptableObject
+    CsvDuplicateRemover : +private static string rilFilePath
+    CsvDuplicateRemover : +public static void RemoveDuplicateEntries()
+    CsvDuplicateRemover : +private static bool IsFileLocked(IOException)
+```
+
+### 解释
+- **继承关系**：`CsvDuplicateRemover`继承自`ScriptableObject`，利用Unity的ScriptableObject特性。
+- **依赖关系**：该类依赖多个命名空间，如`UnityEngine`、`UnityEditor`、`System.IO`等，用于实现文件操作和异常处理。
+
+---
+
+通过以上分析，我们可以清晰地了解该代码文件的功能、结构以及实现细节。该工具在Unity项目中是一个非常实用的资源管理工具，能够有效地去除CSV文件中的重复条目，确保资源库的整洁和高效。
+```

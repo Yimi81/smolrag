@@ -1,0 +1,205 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+public class SelectionBox : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler
+{
+    public RectTransform selectionBox;
+    public RectTransform content;
+
+    private Vector2 startPoint;
+
+    void Start()
+    {
+        selectionBox.gameObject.SetActive(false);
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        startPoint = eventData.position;
+        selectionBox.gameObject.SetActive(true);
+        UpdateSelectionBox(eventData.position);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        UpdateSelectionBox(eventData.position);
+    }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        selectionBox.gameObject.SetActive(false);
+        SelectInstances();
+    }
+
+    private void UpdateSelectionBox(Vector2 currentPoint)
+    {
+        Vector2 size = currentPoint - startPoint;
+        selectionBox.anchoredPosition = startPoint;
+        selectionBox.sizeDelta = new Vector2(Mathf.Abs(size.x), Mathf.Abs(size.y));
+
+        if (size.x < 0)
+            selectionBox.anchoredPosition += new Vector2(size.x, 0);
+        if (size.y < 0)
+            selectionBox.anchoredPosition += new Vector2(0, size.y);
+    }
+
+    private void SelectInstances()
+    {
+        Rect selectionRect = new Rect(selectionBox.anchoredPosition, selectionBox.sizeDelta);
+
+        foreach (Transform child in content)
+        {
+            RectTransform childRect = child.GetComponent<RectTransform>();
+            if (RectTransformUtility.RectangleContainsScreenPoint(selectionBox, childRect.position))
+            {
+                Debug.Log("Selected: " + child.name);
+                // 对选中的实例进行操作，比如高亮显示或添加到选中列表中
+            }
+        }
+    }
+}
+#endif
+源代码内容解释如下：
+### 1. 功能概览
+
+#### 代码功能定位
+该代码实现了一个用于Unity编辑器的选框工具（Selection Box），允许用户通过鼠标拖动在场景视图中选择多个对象。该工具的核心功能包括：
+- **选框绘制**：在鼠标拖动时实时更新选框的大小和位置
+- **对象选择**：检测并记录选框覆盖范围内的所有UI元素
+- **事件处理**：通过Unity的Event Systems接口处理鼠标指针事件
+
+#### 在系统中的角色
+该脚本作为Unity编辑器扩展的一部分，为开发者提供了一种直观的多对象选择工具。它在需要频繁操作多个UI元素的场景中（如关卡编辑器或布局设计器）特别有用。
+
+#### 主要特性与技术实现
+- **事件驱动**：通过实现`IPointerDownHandler`、`IPointerUpHandler`和`IDragHandler`接口，处理鼠标操作事件
+- **实时更新**：在拖动过程中动态调整选框的大小和位置
+- **碰撞检测**：使用`RectTransformUtility.RectangleContainsScreenPoint`方法检测对象是否在选框内
+- **依赖注入**：通过公共变量注入`RectTransform`组件，便于在Inspector面板中配置
+
+---
+
+### 2. 核心类解析
+
+#### `SelectionBox`类
+
+- **职责说明**：
+  - 管理选框的显示与隐藏
+  - 处理鼠标事件以更新选框位置和大小
+  - 检测并记录选框内的对象
+
+- **关键方法清单**：
+  - `public void OnPointerDown(PointerEventData eventData)`：处理鼠标按下事件
+  - `public void OnDrag(PointerEventData eventData)`：处理鼠标拖动事件
+  - `public void OnPointerUp(PointerEventData eventData)`：处理鼠标释放事件
+  - `private void UpdateSelectionBox(Vector2 currentPoint)`：更新选框的位置和大小
+  - `private void SelectInstances()`：检测并记录选框内的对象
+
+- **继承关系**：
+  ```mermaid
+  classDiagram
+    class MonoBehaviour
+    class SelectionBox {
+      <<Extend>>
+    }
+    SelectionBox --> MonoBehaviour
+  ```
+
+- **依赖模块**：
+  - `UnityEngine.EventSystems`：用于处理鼠标事件
+  - `UnityEngine.UI`：用于`RectTransform`和`RectTransformUtility`类
+  - `UnityEngine`：基础Unity功能
+
+---
+
+### 3. 关键方法详解
+
+#### `OnPointerDown(PointerEventData eventData)`
+- **方法签名**：`public void OnPointerDown(PointerEventData eventData)`
+- **功能描述**：
+  - 记录鼠标按下的起始位置
+  - 激活选框（`SetActive(true)`）
+  - 调用`UpdateSelectionBox`方法以更新选框初始位置
+- **调用关系**：
+  - 由Unity的事件系统在鼠标按下时调用
+  - 调用频率：仅在鼠标按下时调用一次
+
+#### `OnDrag(PointerEventData eventData)`
+- **方法签名**：`public void OnDrag(PointerEventData eventData)`
+- **功能描述**：
+  - 拖动过程中不断更新选框的位置和大小
+  - 调用`UpdateSelectionBox`方法以实时调整选框
+- **调用关系**：
+  - 由Unity的事件系统在鼠标拖动时调用
+  - 调用频率：每帧拖动时调用
+
+#### `OnPointerUp(PointerEventData eventData)`
+- **方法签名**：`public void OnPointerUp(PointerEventData eventData)`
+- **功能描述**：
+  - 鼠标释放时隐藏选框
+  - 调用`SelectInstances`方法检测并记录选中的对象
+- **调用关系**：
+  - 由Unity的事件系统在鼠标释放时调用
+  - 调用频率：仅在鼠标释放时调用一次
+
+#### `UpdateSelectionBox(Vector2 currentPoint)`
+- **方法签名**：`private void UpdateSelectionBox(Vector2 currentPoint)`
+- **功能描述**：
+  - 计算选框的大小和位置
+  - 根据鼠标拖动的距离调整选框的`anchoredPosition`和`sizeDelta`
+  - 处理负方向拖动的情况以确保选框正确显示
+- **算法说明**：
+  - 计算当前点与起始点的差值作为选框的大小
+  - 根据差值的正负调整选框的位置
+- **调用关系**：
+  - 由`OnPointerDown`和`OnDrag`方法调用
+  - 调用频率：鼠标拖动时每帧调用
+
+#### `SelectInstances()`
+- **方法签名**：`private void SelectInstances()`
+- **功能描述**：
+  - 创建一个与选框位置和大小匹配的`Rect`区域
+  - 遍历`content`容器的所有子节点
+  - 检测子节点的`RectTransform`是否在选框内
+  - 记录选中的对象（当前仅输出日志）
+- **算法说明**：
+  - 使用`RectTransformUtility.RectangleContainsScreenPoint`方法检测碰撞
+  - 遍历所有子节点，逐个检查是否在选框内
+- **调用关系**：
+  - 由`OnPointerUp`方法调用
+  - 调用频率：仅在鼠标释放时调用一次
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+  class MonoBehaviour
+  class SelectionBox {
+    +void OnPointerDown(PointerEventData eventData)
+    +void OnDrag(PointerEventData eventData)
+    +void OnPointerUp(PointerEventData eventData)
+    +void UpdateSelectionBox(Vector2 currentPoint)
+    +void SelectInstances()
+  }
+  class RectTransform
+  class PointerEventData
+  class Transform
+  class RectTransformUtility
+
+  SelectionBox --> MonoBehaviour : Inherits
+  SelectionBox --> RectTransform : Uses
+  SelectionBox --> PointerEventData : Uses
+  SelectionBox --> Transform : Uses
+  SelectionBox --> RectTransformUtility : Uses
+```
+
+---
+
+### 总结
+
+该代码实现了一个功能完善的选框工具，通过事件驱动的方式处理鼠标操作，实时更新选框并检测选中的对象。它在Unity编辑器中提供了直观的多对象选择功能，适用于需要频繁操作UI元素的场景。代码结构清晰，依赖明确，具有较高的可维护性和扩展性。

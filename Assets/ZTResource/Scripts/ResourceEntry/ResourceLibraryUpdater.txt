@@ -1,0 +1,363 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+
+using UnityEditor;
+using UnityEngine;
+using System.IO;
+using System.Text;
+using System.Collections.Generic;
+
+public class ResourceLibraryUpdater : EditorWindow
+{
+    private List<string> resourcesFolderPaths = new List<string>(); // 资源路径列表
+    private string rilFilePath = "Assets/ZTResource/Resources/ZT_TagLibrary/ResourceIndexLibrary.csv"; // RIL的文件路径
+    private Vector2 scrollPosition; // 用于滚动视图
+    private bool isCancelled = false;
+    private static string defaultResourcesFolderPath = "Assets/ArtResource/Scenes"; // 默认资源路径
+
+    [MenuItem("ZTResource/更新-资源库", false, 1)]
+    public static void ShowWindow()
+    {
+        GetWindow<ResourceLibraryUpdater>("更新资源库");
+    }
+
+    void OnGUI()
+    {
+        GUILayout.Label("RIL文件路径", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        rilFilePath = EditorGUILayout.TextField(rilFilePath);
+        if (GUILayout.Button("浏览", GUILayout.Width(60)))
+        {
+            string path = EditorUtility.SaveFilePanel("选择RIL文件", "", "ResourceIndexLibrary.csv", "csv");
+            if (!string.IsNullOrEmpty(path))
+            {
+                rilFilePath = "Assets" + path.Substring(Application.dataPath.Length); // 转换为相对路径
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+        if (GUILayout.Button("更新全部"))
+        {
+            UpdateResourceIndexLibrary(new List<string> { defaultResourcesFolderPath });
+        }
+    }
+
+    public void UpdateResourceIndexLibrary(List<string> folderPaths)
+    {
+        
+        File.WriteAllText(rilFilePath, string.Empty);// 清空 CSV 文件
+
+        Dictionary<string, string> existingEntries = new Dictionary<string, string>();
+        bool isFileExists = File.Exists(rilFilePath);
+
+        if (isFileExists)
+        {
+            string[] existingLines = File.ReadAllLines(rilFilePath);
+            foreach (string line in existingLines)
+            {
+                string[] columns = line.Split(',');
+                if (columns.Length > 0 && columns[0] != "资源ID")
+                {
+                    string id = columns[0].Trim('"');
+                    existingEntries[id] = line;
+                }
+            }
+        }
+
+        StringBuilder csvContentBuilder = new StringBuilder();
+        csvContentBuilder.AppendLine("资源ID,资源名称,资源描述,长宽高,预制体路径,缩略图路径,面数,创建时间,更新时间,版本,类型标签,主题标签,功能标签,区域标签,批次标签,属性标签");
+
+        int totalCount = 0;
+        foreach (var path in folderPaths)
+        {
+            totalCount += Directory.GetFiles(path, "*.prefab", SearchOption.AllDirectories).Length;
+        }
+
+        int currentIndex = 0;
+        isCancelled = false;
+
+        foreach (var folderPath in folderPaths)
+        {
+            var prefabPaths = Directory.GetFiles(folderPath, "*.prefab", SearchOption.AllDirectories);
+
+            foreach (string prefabPath in prefabPaths)
+            {
+                if (isCancelled)
+                {
+                    EditorUtility.ClearProgressBar();
+                    Debug.LogWarning("更新已被用户取消。");
+                    return;
+                }
+
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                if (prefab != null)
+                {
+                    ResourceInfo info = prefab.GetComponent<ResourceInfo>();
+                    if (info != null)
+                    {
+                        string csvRow = ConvertResourceInfoToCsvRow(info, prefabPath);
+
+                        if (existingEntries.ContainsKey(info.id))
+                        {
+                            existingEntries[info.id] = csvRow;
+                        }
+                        else
+                        {
+                            existingEntries.Add(info.id, csvRow);
+                        }
+                    }
+                }
+
+                if (EditorUtility.DisplayCancelableProgressBar("资源库更新", $"正在更新：{prefab?.name}", (float)currentIndex / totalCount))
+                {
+                    isCancelled = true;
+                }
+
+                currentIndex++;
+            }
+        }
+
+        EditorUtility.ClearProgressBar();
+
+        if (!isCancelled)
+        {
+            try
+            {
+                foreach (var entry in existingEntries)
+                {
+                    csvContentBuilder.AppendLine(entry.Value);
+                }
+
+                File.WriteAllText(rilFilePath, csvContentBuilder.ToString(), Encoding.UTF8);
+                AssetDatabase.Refresh();
+                EditorUtility.DisplayDialog("资源库更新", "RIL更新已完成。", "确定");
+            }
+            catch (IOException ex)
+            {
+                if (IsFileLocked(ex))
+                {
+                    EditorUtility.DisplayDialog("错误", "无法更新资源库，文件可能为只读或已被打开，请关闭文件后重试。", "确定");
+                }
+                else
+                {
+                    throw;
+                }
+            }
+        }
+    }
+
+
+    private static string ConvertResourceInfoToCsvRow(ResourceInfo info, string assetPath)
+    {
+        string thumbnailPath = info.thumbnailPath != null ? info.thumbnailPath : "";
+        string modelFaces = info.modelFaces;
+        string creationDate = info.creationDate;
+        string updatedDate = info.updatedDate;
+        string version = info.version;
+
+        return string.Format(
+            "\"{0}\",\"{1}\",\"{2}\",\"{3:F1}\",\"{4}\",\"{5}\",\"{6}\",\"{7}\",\"{8}\",\"{9}\",\"{10}\",\"{11}\",\"{12}\",\"{13}\",\"{14}\",\"{15}\"",
+            info.id,
+            info.resourceName,
+            info.resourceDescription,
+            info.itemHeight,
+            assetPath,
+            thumbnailPath,  // 使用保存的缩略图路径
+            modelFaces,
+            creationDate,
+            updatedDate,
+            version,
+            string.Join(";", info.typeTags),
+            string.Join(";", info.themeTags),
+            string.Join(";", info.functionTags),
+            string.Join(";", info.definitionTags),
+            string.Join(";", info.batchTags),
+            string.Join(";", info.propertyTags)
+        );
+    }
+
+
+    private static bool IsFileLocked(IOException exception)
+    {
+        int errorCode = System.Runtime.InteropServices.Marshal.GetHRForException(exception) & ((1 << 16) - 1);
+        return errorCode == 32 || errorCode == 33;
+    }
+}
+
+#endif
+源代码内容解释如下：
+### 1. 功能概览
+
+**功能定位：**  
+该代码文件是一个Unity编辑器扩展脚本，用于更新和管理资源库（Resource Index Library，简称RIL）。其主要功能是扫描指定文件夹中的Prefab资源，提取资源信息，并将其写入CSV文件中。
+
+**系统角色与重要性：**  
+该脚本在Unity项目中扮演资源管理工具的角色，帮助开发人员自动化资源索引库的更新过程。这对于维护资源元数据、提高资源管理效率具有重要意义。
+
+**主要特性与技术实现：**  
+- **资源扫描与处理：** 使用Unity的AssetDatabase和Directory类扫描Prefab文件，并提取资源信息。  
+- **CSV文件生成：** 将资源信息格式化为CSV文件，便于其他系统或工具进行数据处理。  
+- **用户界面：** 提供了一个简单的编辑器窗口，允许用户指定RIL文件路径并启动更新过程。  
+- **进度显示与取消：** 在更新过程中显示进度条，并允许用户取消操作。  
+- **错误处理：** 包括文件锁定检测和异常处理。
+
+---
+
+### 2. 核心类解析
+
+**类名称：ResourceLibraryUpdater**
+
+**职责说明：**  
+该类的主要职责是维护和更新资源索引库（RIL）。它通过扫描指定文件夹中的Prefab资源，提取资源元数据，并将其写入CSV文件中。该类还提供了用户界面，允许用户指定RIL文件路径和启动更新过程。
+
+**关键方法清单：**  
+- `public static void ShowWindow()`：显示编辑器窗口。  
+- `void OnGUI()`：绘制编辑器窗口的用户界面。  
+- `public void UpdateResourceIndexLibrary(List<string> folderPaths)`：扫描指定文件夹并生成RIL文件。  
+- `private static string ConvertResourceInfoToCsvRow(ResourceInfo info, string assetPath)`：将资源信息转换为CSV格式的行。  
+- `private static bool IsFileLocked(IOException exception)`：检查文件是否被锁定。
+
+**继承关系：**  
+```mermaid
+classDiagram
+    ResourceLibraryUpdater --> EditorWindow
+    EditorWindow --> Object
+```
+
+**依赖模块：**  
+- UnityEngine  
+- UnityEditor  
+- System.IO  
+- System.Text  
+- System.Collections.Generic  
+
+---
+
+### 3. 关键方法详解
+
+#### 方法：`public static void ShowWindow()`
+
+**方法签名：**  
+```csharp
+[MenuItem("ZTResource/更新-资源库", false, 1)]
+public static void ShowWindow()
+```
+
+**功能描述：**  
+该方法通过Unity的MenuItem属性注册为一个编辑器菜单项，允许用户通过菜单栏启动资源库更新工具。调用`GetWindow<ResourceLibraryUpdater>`方法显示编辑器窗口。
+
+**调用关系：**  
+- 由Unity编辑器菜单调用，频率为用户点击时。
+
+---
+
+#### 方法：`void OnGUI()`
+
+**方法签名：**  
+```csharp
+void OnGUI()
+```
+
+**功能描述：**  
+该方法负责绘制编辑器窗口的用户界面。它包括以下功能：  
+1. 显示RIL文件路径输入框和浏览按钮。  
+2. 提供“更新全部”按钮，点击后调用`UpdateResourceIndexLibrary`方法。  
+
+**调用关系：**  
+- 由Unity编辑器框架自动调用，频率为每帧一次。
+
+---
+
+#### 方法：`public void UpdateResourceIndexLibrary(List<string> folderPaths)`
+
+**方法签名：**  
+```csharp
+public void UpdateResourceIndexLibrary(List<string> folderPaths)
+```
+
+**功能描述：**  
+该方法的主要作用是扫描指定文件夹中的Prefab资源，并将其信息写入RIL文件（CSV格式）。具体步骤如下：  
+1. 清空CSV文件内容。  
+2. 读取现有CSV文件内容并存储到字典中。  
+3. 扫描指定文件夹中的所有Prefab文件。  
+4. 对每个Prefab文件提取资源信息（通过`ResourceInfo`组件获取）。  
+5. 将资源信息转换为CSV格式并更新字典。  
+6. 将字典中的内容写入CSV文件。  
+
+**算法说明：**  
+- 使用字典存储资源ID与CSV行的映射，以确保资源ID的唯一性。  
+- 使用`Directory.GetFiles`递归扫描文件夹中的Prefab文件。  
+- 使用`EditorUtility.DisplayCancelableProgressBar`显示进度条，并允许用户取消操作。
+
+**调用关系：**  
+- 由`OnGUI`方法中的“更新全部”按钮点击事件调用，频率为用户点击时。
+
+---
+
+#### 方法：`private static string ConvertResourceInfoToCsvRow(ResourceInfo info, string assetPath)`
+
+**方法签名：**  
+```csharp
+private static string ConvertResourceInfoToCsvRow(ResourceInfo info, string assetPath)
+```
+
+**功能描述：**  
+该方法将`ResourceInfo`组件中的资源信息转换为CSV格式的行。CSV行包含以下字段：  
+- 资源ID  
+- 资源名称  
+- 资源描述  
+- 长宽高  
+- 预制体路径  
+- 缩略图路径  
+- 面数  
+- 创建时间  
+- 更新时间  
+- 版本  
+- 类型标签、主题标签、功能标签、区域标签、批次标签、属性标签  
+
+**算法说明：**  
+- 使用`string.Format`将资源信息格式化为CSV行。  
+- 标签字段使用分号`;`分隔。
+
+**调用关系：**  
+- 由`UpdateResourceIndexLibrary`方法调用，频率为每个Prefab文件处理一次。
+
+---
+
+#### 方法：`private static bool IsFileLocked(IOException exception)`
+
+**方法签名：**  
+```csharp
+private static bool IsFileLocked(IOException exception)
+```
+
+**功能描述：**  
+该方法用于检测文件是否被锁定（例如被其他程序占用）。通过检查异常的错误码来判断文件是否被锁定。
+
+**算法说明：**  
+- 使用`Marshal.GetHRForException`获取异常的HRESULT错误码。  
+- 错误码32表示文件被其他进程占用，错误码33表示文件正在被另一个进程写入。
+
+**调用关系：**  
+- 由`UpdateResourceIndexLibrary`方法在文件写入失败时调用，频率为文件写入失败时。
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class ResourceLibraryUpdater {
+        +void OnGUI()
+        +void UpdateResourceIndexLibrary(List<string> folderPaths)
+        +string ConvertResourceInfoToCsvRow(ResourceInfo info, string assetPath)
+        +bool IsFileLocked(IOException exception)
+        +static void ShowWindow()
+        +List<string> resourcesFolderPaths
+        +string rilFilePath
+        +Vector2 scrollPosition
+        +bool isCancelled
+        +static string defaultResourcesFolderPath
+    }
+    ResourceLibraryUpdater --> EditorWindow
+    EditorWindow --> Object
+```

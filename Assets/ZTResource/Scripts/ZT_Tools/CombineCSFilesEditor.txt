@@ -1,0 +1,350 @@
+文件源代码内容如下：
+﻿#if UNITY_EDITOR
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+using System.Text;
+using System.Linq;
+using System.Collections.Generic;
+using System;
+
+public class CombineCSFilesEditor : EditorWindow
+{
+    private List<string> filePaths = new List<string>();
+    private HashSet<string> directories = new HashSet<string>();
+    private string outputPath = "Assets/GPT/ZTResource.txt";
+    private int selectedEncodingIndex = 0;
+    private int maxCharsPerFile = 200000;
+    private Vector2 scrollPosition;
+
+    private static readonly Dictionary<string, Encoding> Encodings = new Dictionary<string, Encoding>
+    {
+        {"UTF-8 (no BOM)", new UTF8Encoding(false)},
+        {"UTF-8 (with BOM)", new UTF8Encoding(true)},
+        {"ASCII", Encoding.ASCII},
+        {"Unicode", Encoding.Unicode},
+        {"BigEndianUnicode", Encoding.BigEndianUnicode},
+        {"UTF-32", Encoding.UTF32},
+        {"GB2312", Encoding.GetEncoding("GB2312")},
+        {"Default", Encoding.Default}
+    };
+
+    [MenuItem("ZTResource/Tools/其他/合并CS文件")]
+    public static void ShowWindow()
+    {
+        GetWindow<CombineCSFilesEditor>("合并 CS 文件");
+    }
+
+    private void OnGUI()
+    {
+        GUILayout.Label("合并 CS 文件", EditorStyles.boldLabel);
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+
+        HandleDragAndDrop();
+
+        EditorGUILayout.Space();
+        GUILayout.Label("已添加内容:");
+        DisplayPathsWithRemoveButton(directories.ToList(), directories, "目录");
+        DisplayPathsWithRemoveButton(filePaths, null, "文件");
+
+        EditorGUILayout.Space();
+        GUILayout.Label("输出设置:", EditorStyles.boldLabel);
+        outputPath = EditorGUILayout.TextField("输出路径:", outputPath).Replace('\\', '/');
+        selectedEncodingIndex = EditorGUILayout.Popup("文件编码:", selectedEncodingIndex, Encodings.Keys.ToArray());
+        maxCharsPerFile = EditorGUILayout.IntField("单个文件最大字符数:", maxCharsPerFile);
+
+        EditorGUILayout.Space();
+        if (GUILayout.Button("生成合并文件", GUILayout.Height(30)))
+        {
+            CombineFiles(outputPath, Encodings.Keys.ToArray()[selectedEncodingIndex]);
+        }
+
+        EditorGUILayout.EndScrollView();
+    }
+
+    private void HandleDragAndDrop()
+    {
+        Event evt = Event.current;
+        Rect dropArea = GUILayoutUtility.GetRect(0.0f, 50.0f, GUILayout.ExpandWidth(true));
+        GUI.Box(dropArea, "拖拽文件夹或文件到这里", EditorStyles.helpBox);
+
+        switch (evt.type)
+        {
+            case EventType.DragUpdated:
+            case EventType.DragPerform:
+                if (!dropArea.Contains(evt.mousePosition)) return;
+
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+                if (evt.type == EventType.DragPerform)
+                {
+                    DragAndDrop.AcceptDrag();
+                    foreach (string path in DragAndDrop.paths)
+                    {
+                        string normalizedPath = path.Replace('\\', '/');
+                        if (Directory.Exists(normalizedPath))
+                        {
+                            directories.Add(normalizedPath);
+                        }
+                        else if (File.Exists(normalizedPath) && Path.GetExtension(normalizedPath).Equals(".cs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            filePaths.Add(normalizedPath);
+                        }
+                    }
+                }
+                Event.current.Use();
+                break;
+        }
+    }
+
+    private void CombineFiles(string output, string encodingName)
+    {
+        try
+        {
+            output = output.Replace('\\', '/');
+            List<string> allFiles = new List<string>(filePaths);
+
+            foreach (string directory in directories)
+            {
+                allFiles.AddRange(Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories)
+                    .Select(f => f.Replace('\\', '/'))
+                    .Where(f => !Path.GetFileName(f).StartsWith("._")));
+            }
+
+            if (allFiles.Count == 0)
+            {
+                Debug.LogError("未选择任何文件");
+                return;
+            }
+
+            Encoding encoding = Encodings[encodingName];
+            string directoryPath = Path.GetDirectoryName(output).Replace('\\', '/');
+            string fileName = Path.GetFileNameWithoutExtension(output);
+            string extension = Path.GetExtension(output);
+
+            int fileIndex = 1;
+            StringBuilder contentBuilder = new StringBuilder();
+            int totalProcessed = 0;
+
+            foreach (string file in allFiles)
+            {
+                string relativePath = GetRelativeProjectPath(file);
+                string content = $"// ==========================\n" +
+                                $"// Path: {relativePath}\n" +
+                                $"// ==========================\n\n" +
+                                $"{ReadFileWithEncoding(file, encoding)}\n\n";
+                content = NormalizeLineEndings(content, Environment.NewLine);
+
+                if (content.Length > maxCharsPerFile * 0.5f)
+                {
+                    if (contentBuilder.Length > 0)
+                    {
+                        WriteFile(directoryPath, fileName, extension, fileIndex++, contentBuilder.ToString(), encoding);
+                        contentBuilder.Clear();
+                    }
+                    WriteFile(directoryPath, fileName, extension, fileIndex++, content, encoding);
+                    continue;
+                }
+
+                if (contentBuilder.Length + content.Length > maxCharsPerFile)
+                {
+                    WriteFile(directoryPath, fileName, extension, fileIndex++, contentBuilder.ToString(), encoding);
+                    contentBuilder.Clear();
+                }
+
+                contentBuilder.Append(content);
+                totalProcessed++;
+
+                EditorUtility.DisplayProgressBar("合并进度",
+                    $"正在处理文件 ({totalProcessed}/{allFiles.Count})",
+                    (float)totalProcessed / allFiles.Count);
+            }
+
+            if (contentBuilder.Length > 0)
+                WriteFile(directoryPath, fileName, extension, fileIndex, contentBuilder.ToString(), encoding);
+
+            AssetDatabase.Refresh();
+            EditorUtility.ClearProgressBar();
+            Debug.Log($"合并完成！共生成 {fileIndex} 个文件");
+        }
+        catch (Exception ex)
+        {
+            EditorUtility.ClearProgressBar();
+            Debug.LogError($"合并失败: {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+
+    private void WriteFile(string directory, string baseName, string extension, int index, string content, Encoding encoding)
+    {
+        string path = Path.Combine(directory, $"{baseName}_{index}{extension}").Replace('\\', '/');
+        File.WriteAllText(path, content, encoding);
+        Debug.Log($"文件已生成：{GetRelativeProjectPath(path)} ({content.Length} 字符)");
+    }
+
+    private string ReadFileWithEncoding(string path, Encoding encoding)
+    {
+        return File.ReadAllText(path, encoding);
+    }
+
+    private string NormalizeLineEndings(string text, string newLine)
+    {
+        return text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", newLine);
+    }
+
+    private string GetRelativeProjectPath(string absolutePath)
+    {
+        string projectPath = Application.dataPath.Replace("/Assets", "").Replace('\\', '/');
+        absolutePath = absolutePath.Replace('\\', '/');
+
+        if (absolutePath.StartsWith(projectPath))
+        {
+            return absolutePath.Substring(projectPath.Length + 1);
+        }
+        return absolutePath;
+    }
+
+    private void DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet, string label)
+    {
+        EditorGUILayout.BeginVertical(GUI.skin.box);
+        GUILayout.Label($"{label} ({paths.Count}):");
+
+        for (int i = 0; i < paths.Count; i++)
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(GetRelativeProjectPath(paths[i]), EditorStyles.wordWrappedLabel);
+            if (GUILayout.Button("×", GUILayout.Width(20)))
+            {
+                if (pathSet != null) pathSet.Remove(paths[i]);
+                else filePaths.RemoveAt(i);
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+        EditorGUILayout.EndVertical();
+    }
+}
+#endif
+源代码内容解释如下：
+```markdown
+# 代码文件分析报告
+
+## 1. 功能概览
+
+- **功能定位**：这是一个Unity编辑器工具，用于合并多个C#文件（.cs）到一个或多个目标文件中。它支持拖放文件或文件夹，提供编码选择和文件分割功能。
+- **角色与重要性**：在Unity项目中，当需要将多个脚本文件合并成一个或多个较大的文件时，此工具非常有用。它简化了手动合并文件的过程，减少了人为错误，并提高了开发效率。
+- **主要特性与技术实现**：
+  - **拖放功能**：支持将文件或文件夹拖放到编辑器窗口中。
+  - **编码选择**：提供多种编码格式（如UTF-8、Unicode等）供用户选择。
+  - **文件分割**：根据设置的最大字符数自动分割文件。
+  - **进度显示**：在合并过程中显示进度条，便于用户了解处理状态。
+
+## 2. 核心类解析
+
+### CombineCSFilesEditor
+
+- **职责说明**：该类是一个Unity编辑器窗口，主要用于处理文件合并逻辑，包括文件的拖放、选择、合并和输出设置。
+- **关键方法清单**：
+  - `OnGUI()`：绘制编辑器窗口的UI界面。
+  - `HandleDragAndDrop()`：处理文件或文件夹的拖放事件。
+  - `CombineFiles(string output, string encodingName)`：合并文件的核心逻辑。
+  - `WriteFile(string directory, string baseName, string extension, int index, string content, Encoding encoding)`：将合并后的内容写入文件。
+  - `ReadFileWithEncoding(string path, Encoding encoding)`：读取文件内容并指定编码。
+  - `NormalizeLineEndings(string text, string newLine)`：标准化文本中的换行符。
+  - `GetRelativeProjectPath(string absolutePath)`：获取文件的相对路径。
+  - `DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet, string label)`：显示已添加的文件或文件夹，并提供删除功能。
+- **继承关系**：
+  ```mermaid
+  CombineCSFilesEditor --> EditorWindow
+  ```
+- **依赖模块**：
+  - `UnityEditor`：用于编辑器窗口和相关功能。
+  - `UnityEngine`：Unity核心功能。
+  - `System.IO`：文件操作。
+  - `System.Text`：编码处理。
+  - `System.Linq`：集合操作。
+  - `System.Collections.Generic`：泛型集合。
+  - `System`：基础功能。
+
+## 3. 关键方法详解
+
+### `OnGUI()`
+
+- **方法签名**：`private void OnGUI()`
+- **功能描述**：负责绘制编辑器窗口的用户界面，包括标题、拖放区域、已添加文件列表、输出设置和生成按钮。
+- **调用关系**：此方法在Unity编辑器窗口生命周期中自动调用，频率为每次窗口更新。
+
+### `HandleDragAndDrop()`
+
+- **方法签名**：`private void HandleDragAndDrop()`
+- **功能描述**：处理文件或文件夹的拖放事件，更新文件路径列表。
+- **调用关系**：在`OnGUI()`中被调用，频率为每次拖放操作。
+
+### `CombineFiles(string output, string encodingName)`
+
+- **方法签名**：`private void CombineFiles(string output, string encodingName)`
+- **功能描述**：合并所有选定的C#文件到目标文件中。如果文件内容超过最大字符数，则自动分割成多个文件。
+- **算法说明**：遍历所有选定文件，读取内容并合并，根据字符数限制分割文件。
+- **调用关系**：在`OnGUI()`中被生成按钮调用，频率为用户点击生成按钮时。
+
+### `WriteFile(string directory, string baseName, string extension, int index, string content, Encoding encoding)`
+
+- **方法签名**：`private void WriteFile(string directory, string baseName, string extension, int index, string content, Encoding encoding)`
+- **功能描述**：将合并后的内容写入指定文件。
+- **调用关系**：在`CombineFiles()`中被调用，频率为每次需要写入新文件时。
+
+### `ReadFileWithEncoding(string path, Encoding encoding)`
+
+- **方法签名**：`private string ReadFileWithEncoding(string path, Encoding encoding)`
+- **功能描述**：读取指定路径的文件内容，并使用指定的编码。
+- **调用关系**：在`CombineFiles()`中被调用，频率为每次读取文件时。
+
+### `NormalizeLineEndings(string text, string newLine)`
+
+- **方法签名**：`private string NormalizeLineEndings(string text, string newLine)`
+- **功能描述**：将文本中的换行符统一为指定格式。
+- **调用关系**：在`CombineFiles()`中被调用，频率为每次处理文件内容时。
+
+### `GetRelativeProjectPath(string absolutePath)`
+
+- **方法签名**：`private string GetRelativeProjectPath(string absolutePath)`
+- **功能描述**：将绝对路径转换为相对于项目路径的相对路径。
+- **调用关系**：在`DisplayPathsWithRemoveButton()`和`WriteFile()`中被调用，频率为需要显示或记录路径时。
+
+### `DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet, string label)`
+
+- **方法签名**：`private void DisplayPathsWithRemoveButton(List<string> paths, HashSet<string> pathSet, string label)`
+- **功能描述**：显示已添加的文件或文件夹，并提供删除功能。
+- **调用关系**：在`OnGUI()`中被调用，频率为每次窗口更新时。
+
+## 4. 架构关系图
+
+```mermaid
+classDiagram
+
+    class CombineCSFilesEditor {
+        #filePathList: List<string>
+        #directories: HashSet<string>
+        #outputPath: string
+        #selectedEncodingIndex: int
+        #maxCharsPerFile: int
+        #scrollPosition: Vector2
+        #Encodings: Dictionary<string, Encoding>
+
+        +OnGUI()
+        +HandleDragAndDrop()
+        +CombineFiles(string, string)
+        +WriteFile(string, string, string, int, string, Encoding)
+        +ReadFileWithEncoding(string, Encoding)
+        +NormalizeLineEndings(string, string)
+        +GetRelativeProjectPath(string)
+        +DisplayPathsWithRemoveButton(List<string>, HashSet<string>, string)
+    }
+
+    CombineCSFilesEditor --> EditorWindow
+    CombineCSFilesEditor --> System.IO
+    CombineCSFilesEditor --> UnityEditor
+    CombineCSFilesEditor --> UnityEngine
+    CombineCSFilesEditor --> System.Text
+    CombineCSFilesEditor --> System.Linq
+    CombineCSFilesEditor --> System.Collections.Generic
+    CombineCSFilesEditor --> System
+```

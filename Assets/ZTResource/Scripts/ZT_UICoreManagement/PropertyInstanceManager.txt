@@ -1,0 +1,187 @@
+文件源代码内容如下：
+using UnityEngine;
+using TMPro;
+
+public class PropertyInstanceManager : MonoBehaviour
+{
+    public GameObject LODInstance; // LDO
+    public GameObject ColorChangeInstance; // 变色
+    public GameObject WallMountInstance; // 壁挂    
+    public GameObject DynamicInstance; // 动态
+    public GameObject HookPointInstance; // 挂点
+    public GameObject OldEffectInstance; // 做旧
+    public TMP_Text Property_Text;
+
+    // 添加实例的方法
+    public void AddLODInstance(GameObject instance)
+    {
+        LODInstance = instance;
+    }
+
+    public void AddColorChangeInstance(GameObject instance)
+    {
+        ColorChangeInstance = instance;
+    }
+
+    public void AddWallMountInstance(GameObject instance)
+    {
+        WallMountInstance = instance;
+    }
+
+    public void AddHookPointInstance(GameObject instance)
+    {
+        HookPointInstance = instance;
+    }
+
+    public void AddDynamicInstance(GameObject instance)
+    {
+        DynamicInstance = instance;
+    }
+
+    public void AddOldEffectInstance(GameObject instance)
+    {
+        OldEffectInstance = instance;
+    }
+
+    // 添加Property_Text实例的方法
+    public void AddPropertyText(TMP_Text text)
+    {
+        Property_Text = text;
+    }
+
+    // 更新实例显示状态的方法
+    public void UpdateInstanceVisibility()
+    {
+        if (Property_Text == null) return;
+
+        string text = Property_Text.text;
+
+        LODInstance?.SetActive(text.Contains("LOD"));
+        ColorChangeInstance?.SetActive(text.Contains("变色"));
+        WallMountInstance?.SetActive(text.Contains("壁挂"));
+        HookPointInstance?.SetActive(text.Contains("挂点"));
+        DynamicInstance?.SetActive(text.Contains("动态"));
+        OldEffectInstance?.SetActive(text.Contains("做旧"));
+    }
+}
+
+源代码内容解释如下：
+### 1. 功能概览
+
+#### 功能定位
+
+`PropertyInstanceManager` 类是一个用于管理游戏对象实例和文本属性显示的工具类。它主要负责维护不同类型的实例对象，并根据文本内容动态控制这些实例的可见性。
+
+#### 系统角色
+
+在Unity项目中，该类充当实例管理器，确保各个功能模块（如LOD、变色、壁挂等）的实例能够根据文本描述正确显示或隐藏。它是系统中实例管理的核心组件，对于动态展示功能至关重要。
+
+#### 主要特性与技术实现
+
+- **实例管理**：维护多个GameObject实例，包括LOD、颜色变化、壁挂、动态、挂点和做旧效果。
+- **文本属性控制**：通过解析TMP_Text组件的内容，动态调整实例的可见性。
+- **模块化设计**：每个实例管理功能独立，便于扩展和维护。
+- **依赖管理**：使用Unity的MonoBehaviour和TextMeshPro组件。
+
+### 2. 核心类解析
+
+#### `PropertyInstanceManager` 类
+
+- **职责说明**：管理多个实例对象，并根据文本内容动态控制其显示状态。
+  
+- **关键方法清单**：
+  - `public void AddLODInstance(GameObject instance)`
+  - `public void AddColorChangeInstance(GameObject instance)`
+  - `public void AddWallMountInstance(GameObject instance)`
+  - `public void AddHookPointInstance(GameObject instance)`
+  - `public void AddDynamicInstance(GameObject instance)`
+  - `public void AddOldEffectInstance(GameObject instance)`
+  - `public void AddPropertyText(TMP_Text text)`
+  - `public void UpdateInstanceVisibility()`
+
+- **继承关系**：
+  ```mermaid
+  classDiagram
+    class PropertyInstanceManager {
+      +MonoBehaviour
+    }
+    PropertyInstanceManager --> MonoBehaviour
+  ```
+
+- **依赖模块**：
+  - `UnityEngine`：用于访问Unity引擎功能。
+  - `TextMeshPro`：用于处理文本显示。
+
+### 3. 关键方法详解
+
+#### 方法签名与功能描述
+
+1. **`public void AddLODInstance(GameObject instance)`**
+   - **功能描述**：设置LOD（细节层次）实例对象。
+   - **调用关系**：通常在初始化或动态加载时被调用。
+
+2. **`public void AddColorChangeInstance(GameObject instance)`**
+   - **功能描述**：设置颜色变化实例对象。
+   - **调用关系**：在初始化或颜色变化功能加载时调用。
+
+3. **`public void AddWallMountInstance(GameObject instance)`**
+   - **功能描述**：设置壁挂实例对象。
+   - **调用关系**：初始化或壁挂功能加载时调用。
+
+4. **`public void AddHookPointInstance(GameObject instance)`**
+   - **功能描述**：设置挂点实例对象。
+   - **调用关系**：初始化或挂点功能加载时调用。
+
+5. **`public void AddDynamicInstance(GameObject instance)`**
+   - **功能描述**：设置动态效果实例对象。
+   - **调用关系**：初始化或动态效果加载时调用。
+
+6. **`public void AddOldEffectInstance(GameObject instance)`**
+   - **功能描述**：设置做旧效果实例对象。
+   - **调用关系**：初始化或做旧效果加载时调用。
+
+7. **`public void AddPropertyText(TMP_Text text)`**
+   - **功能描述**：设置属性文本组件，用于解析文本内容。
+   - **调用关系**：通常在初始化时调用。
+
+8. **`public void UpdateInstanceVisibility()`**
+   - **功能描述**：根据属性文本内容，更新实例对象的可见性。
+   - **调用关系**：可能在文本变化时被调用，频率取决于文本更新频率。
+
+#### 算法说明
+
+- **UpdateInstanceVisibility方法**：
+  - 检查`Property_Text`是否存在，若不存在则返回。
+  - 读取文本内容，检查是否包含特定关键词（如“LOD”、“变色”等）。
+  - 根据关键词的存在与否，设置对应实例对象的活动状态。
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class PropertyInstanceManager {
+        +MonoBehaviour
+        +GameObject LODInstance
+        +GameObject ColorChangeInstance
+        +GameObject WallMountInstance
+        +GameObject DynamicInstance
+        +GameObject HookPointInstance
+        +GameObject OldEffectInstance
+        +TMP_Text Property_Text
+        +void AddLODInstance(GameObject instance)
+        +void AddColorChangeInstance(GameObject instance)
+        +void AddWallMountInstance(GameObject instance)
+        +void AddHookPointInstance(GameObject instance)
+        +void AddDynamicInstance(GameObject instance)
+        +void AddOldEffectInstance(GameObject instance)
+        +void AddPropertyText(TMP_Text text)
+        +void UpdateInstanceVisibility()
+    }
+    PropertyInstanceManager --> MonoBehaviour
+    PropertyInstanceManager *--> GameObject
+    PropertyInstanceManager *--> TMP_Text
+```
+
+### 总结
+
+`PropertyInstanceManager` 类通过维护多个实例对象和解析文本内容，实现了动态控制实例可见性的功能。其设计简洁明了，便于扩展和维护，是项目中重要的实例管理组件。

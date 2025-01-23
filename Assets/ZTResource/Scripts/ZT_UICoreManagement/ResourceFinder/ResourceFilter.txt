@@ -1,0 +1,210 @@
+文件源代码内容如下：
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
+public class ResourceFilter : MonoBehaviour
+{
+    private ResourceManager resourceManager;
+
+    private void Awake()
+    {
+        resourceManager = GetComponent<ResourceManager>();
+    }
+
+    public List<ResourceCardData> FilterResources(string[] typeTags, string[] themeTags, string[] functionTags, string[] batchTags, string[] definitionTags, string[] propertyTags, string searchTerm, List<string> idList)
+    {
+        var allResources = resourceManager.GetAllResources();
+
+        var filteredResources = allResources.Where(resource =>
+            (batchTags == null || batchTags.Length == 0 || batchTags.All(tag => resource.BatchTags.Contains(tag))) &&
+            (functionTags == null || functionTags.Length == 0 || functionTags.All(tag => resource.FunctionTags.Contains(tag))) &&
+            (themeTags == null || themeTags.Length == 0 || themeTags.All(tag => resource.ThemeTags.Contains(tag))) &&
+            (typeTags == null || typeTags.Length == 0 || typeTags.All(tag => resource.TypeTags.Contains(tag))) &&
+            (definitionTags == null || definitionTags.Length == 0 || definitionTags.All(tag => resource.DefinitionTags.Contains(tag))) &&
+            (propertyTags == null || propertyTags.Length == 0 || propertyTags.All(tag => resource.PropertyTags.Contains(tag)))
+        ).ToList();
+
+        // 搜索词筛选：包括名称、描述、ID、缩略图路径和所有类型的标签
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            searchTerm = searchTerm.ToLower();
+            filteredResources = filteredResources.Where(resource =>
+                resource.Name.ToLower().Contains(searchTerm) ||
+                resource.Description.ToLower().Contains(searchTerm) ||
+                resource.ID.ToLower().Contains(searchTerm) || // 新增ID字段筛选
+                resource.ThumbnailPath.ToLower().Contains(searchTerm) || // 新增缩略图路径筛选
+                resource.TypeTags.Any(tag => tag.ToLower().Contains(searchTerm)) ||
+                resource.ThemeTags.Any(tag => tag.ToLower().Contains(searchTerm)) ||
+                resource.FunctionTags.Any(tag => tag.ToLower().Contains(searchTerm)) ||
+                resource.BatchTags.Any(tag => tag.ToLower().Contains(searchTerm)) ||
+                resource.DefinitionTags.Any(tag => tag.ToLower().Contains(searchTerm)) ||
+                resource.PropertyTags.Any(tag => tag.ToLower().Contains(searchTerm))
+            ).ToList();
+        }
+
+        // ID 列表筛选
+        if (idList != null && idList.Count > 0)
+        {
+            filteredResources = filteredResources.Where(resource => idList.Contains(resource.ID)).ToList();
+        }
+
+        return filteredResources; // 返回过滤后的资源列表
+    }
+
+    // 新增方法：根据资源ID列表获取资源
+    public List<ResourceCardData> GetResourcesByIds(List<string> ids)
+    {
+        var allResources = resourceManager.GetAllResources();
+        return allResources.Where(resource => ids.Contains(resource.ID)).ToList();
+    }
+
+    // 打印符合条件的资源信息
+    public void PrintFilteredResources(List<ResourceCardData> filteredResources)
+    {
+        if (filteredResources == null || filteredResources.Count == 0)
+        {
+            return;
+        }
+        foreach (var resource in filteredResources)
+        {
+            // Debug.Log($"Name: {resource.Name}, Description: {resource.Description}, Height: {resource.Height}," +
+            //     $"Type Tags: {string.Join(", ", resource.TypeTags)}, Theme Tags: {string.Join(", ", resource.ThemeTags)}," +
+            //     $"Function Tags: {string.Join(", ", resource.FunctionTags)}, Definition Tags: {string.join(", ", resource.DefinitionTags)}," +
+            //     $"Batch Tags: {string.Join(", ", resource.BatchTags)}, Property Tags: {string.Join(", ", resource.PropertyTags)}," +
+            //     $"Prefab Path: {resource.PrefabPath}, Thumbnail Path: {resource.ThumbnailPath}");
+        }
+    }
+}
+
+源代码内容解释如下：
+### 1. 功能概览
+
+- **功能定位**：`ResourceFilter` 类是一个资源过滤器，用于根据多种标签和条件筛选资源数据。它通过 `ResourceManager` 获取资源数据，并根据类型标签、主题标签、功能标签等进行过滤。
+
+- **角色和重要性**：在系统中，`ResourceFilter` 起着资源管理的核心作用，帮助快速定位和筛选符合条件的资源。这对于资源检索和管理至关重要。
+
+- **主要特性与技术实现**：
+  - 多标签过滤：支持多种标签组合筛选（类型、主题、功能、批次、定义、属性）。
+  - 搜索词过滤：支持基于资源名称、描述、ID和缩略图路径的模糊搜索。
+  - ID列表过滤：支持通过资源ID列表进行精确筛选。
+  - 打印资源信息：用于调试和验证筛选结果。
+  - **技术实现**：使用 LINQ 进行数据筛选，通过依赖 `ResourceManager` 获取资源数据。
+
+---
+
+### 2. 核心类解析
+
+#### `ResourceFilter`
+
+- **职责说明**：`ResourceFilter` 的主要职责是根据给定的条件对资源进行过滤和筛选。它通过 `ResourceManager` 获取资源数据，并根据标签、搜索词和 ID 列表等条件进行多维度筛选。
+
+- **关键方法清单**：
+  - `public List<ResourceCardData> FilterResources(string[] typeTags, string[] themeTags, string[] functionTags, string[] batchTags, string[] definitionTags, string[] propertyTags, string searchTerm, List<string> idList)`
+  - `public List<ResourceCardData> GetResourcesByIds(List<string> ids)`
+  - `public void PrintFilteredResources(List<ResourceCardData> filteredResources)`
+
+- **继承关系**：
+  ```mermaid
+  ResourceFilter -> MonoBehaviour
+  ```
+
+- **依赖模块**：
+  - `ResourceManager`（通过 `GetComponent<ResourceManager>()` 获取）
+
+---
+
+### 3. 关键方法详解
+
+#### 方法 1：`FilterResources`
+
+- **方法签名**：
+  ```csharp
+  public List<ResourceCardData> FilterResources(string[] typeTags, string[] themeTags, string[] functionTags, string[] batchTags, string[] definitionTags, string[] propertyTags, string searchTerm, List<string> idList)
+  ```
+
+- **功能描述**：
+  根据多个标签数组、搜索词和 ID 列表对资源进行多维度筛选。首先通过标签筛选，然后根据搜索词进行模糊匹配，最后根据 ID 列表进行精确筛选。
+
+- **算法说明**：
+  - 使用 LINQ 的 `Where` 方法进行过滤。
+  - 标签筛选：检查每个标签数组是否为空，如果不为空则要求资源的所有标签都包含指定的标签。
+  - 搜索词筛选：将搜索词转换为小写后，检查资源的名称、描述、ID、缩略图路径和所有标签是否包含搜索词。
+  - ID 列表筛选：仅返回 ID 列表中包含的资源。
+
+- **调用关系**：
+  - 通常由 UI 控制器或用户交互逻辑调用，调用频率较高。
+
+---
+
+#### 方法 2：`GetResourcesByIds`
+
+- **方法签名**：
+  ```csharp
+  public List<ResourceCardData> GetResourcesByIds(List<string> ids)
+  ```
+
+- **功能描述**：
+  根据给定的资源 ID 列表，返回对应的资源数据列表。
+
+- **算法说明**：
+  - 通过LINQ的`Where`方法筛选出 ID 匹配的资源。
+
+- **调用关系**：
+  - 通常由需要快速获取特定资源的模块调用，调用频率中等。
+
+---
+
+#### 方法 3：`PrintFilteredResources`
+
+- **方法签名**：
+  ```csharp
+  public void PrintFilteredResources(List<ResourceCardData> filteredResources)
+  ```
+
+- **功能描述**：
+  打印筛选后的资源信息，用于调试和验证。
+
+- **算法说明**：
+  - 遍历资源列表并使用 `Debug.Log` 输出资源的详细信息。
+
+- **调用关系**：
+  - 通常由开发人员在调试阶段调用，调用频率较低。
+
+---
+
+### 4. 架构关系图
+
+```mermaid
+classDiagram
+    class ResourceFilter {
+        +List<ResourceCardData> FilterResources(...)
+        +List<ResourceCardData> GetResourcesByIds(...)
+        +void PrintFilteredResources(...)
+        -ResourceManager resourceManager
+    }
+    class ResourceManager {
+        +List<ResourceCardData> GetAllResources()
+    }
+    class ResourceCardData {
+        +string Name
+        +string Description
+        +string ID
+        +string ThumbnailPath
+        +string[] TypeTags
+        +string[] ThemeTags
+        +string[] FunctionTags
+        +string[] BatchTags
+        +string[] DefinitionTags
+        +string[] PropertyTags
+        +string PrefabPath
+    }
+    ResourceFilter --> ResourceManager :GetComponent
+    ResourceFilter --> ResourceCardData :List of
+```
+
+---
+
+### 总结
+
+`ResourceFilter` 类通过多维度的标签、搜索词和 ID 筛选功能，为资源管理提供了灵活且高效的支持。它在系统中扮演着资源检索的核心角色，依赖 `ResourceManager` 获取资源数据，并通过 LINQ 实现高效的过滤逻辑。通过清晰的继承关系和依赖管理，`ResourceFilter` 确保了系统的模块化和可维护性。

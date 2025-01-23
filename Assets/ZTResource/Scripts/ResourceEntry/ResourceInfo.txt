@@ -1,0 +1,152 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+
+using UnityEngine;
+using System.Collections.Generic;
+
+[System.Serializable]
+
+//作用：定义了资源信息的数据结构，通常附加于游戏内的资源（如预制体）上。它包含了资源名称、描述、缩略图以及各种标签（如类型、主题、功能等）。
+public class ResourceInfo : MonoBehaviour
+{
+    public string id;//资源ID
+    public string resourceName;//资源名称
+    public string resourceDescription;//资源介绍
+    public string thumbnailPath;//缩略图路径
+    public string modelFaces;//资源面数
+    public string itemHeight; // 物品长宽高                   
+    public Texture2D resourceThumbnail;//缩略图本身
+    public string prefabPath;//prefab路径
+    public string creationDate;//资源创建时间  
+    public string updatedDate;//资源更新时间
+    public string version;//资源版本
+    public List<string> typeTags;//类型标签
+    public List<string> themeTags;//主题标签
+    public List<string> functionTags;//功能标签
+    public List<string> definitionTags;//定义标签
+    public List<string> batchTags;//批次标签
+    public List<string> propertyTags;//属性标签
+    // 可以根据需要添加更多字段
+}
+#endif
+源代码内容解释如下：
+### 功能概览
+
+- **功能定位**：该代码文件定义了一个名为 `ResourceInfo` 的类，用于存储和管理游戏资源（如预制体）的元数据。这些元数据包括资源ID、名称、描述、缩略图路径、标签等信息，便于在游戏中对资源进行分类、搜索和管理。
+
+- **系统角色**：该类在游戏资源管理系统中扮演核心数据结构的角色，是资源元数据的载体。它帮助开发人员快速定位、组织和管理游戏内的各种资源，提升开发效率。
+
+- **主要特性与技术实现**：
+  - **数据结构**：通过字段和列表存储资源的详细信息。
+  - **序列化支持**：使用 `[System.Serializable]` 属性，便于在 Unity 编辑器中进行数据持久化和可视化。
+  - **标签系统**：支持多种类型的标签（如类型、主题、功能等），增强资源的可分类性。
+  - **依赖性**：依赖于 Unity 引擎的 `UnityEngine` 和 `System.Collections.Generic` 命名空间。
+
+---
+
+### 核心类解析
+
+#### `ResourceInfo` 类
+
+- **职责说明**：该类的主要职责是存储和管理游戏资源的元数据。它是一个 MonoBehaviour 组件，通常附加到预制体或其他资源对象上，以提供详细的资源信息。
+
+- **关键方法清单**：
+  - `Awake()`：MonoBehaviour 生命周期方法，用于初始化。
+  - `Start()`：MonoBehaviour 生命周期方法，用于执行启动逻辑。
+  - `OnEnable()`：MonoBehaviour 生命周期方法，用于在脚本启用时执行逻辑。
+  - `OnDisable()`：MonoBehaviour 生命周期方法，用于在脚本禁用时执行逻辑。
+  - `Update()`：MonoBehaviour 生命周期方法，用于每帧更新逻辑。
+
+- **继承关系**：
+  ```
+  ResourceInfo -> MonoBehaviour -> Behaviour -> UnityEngine.Object
+  ```
+
+- **依赖模块**：
+  - `UnityEngine`：用于MonoBehaviour类及其相关功能。
+  - `System.Collections.Generic`：用于List等集合类型。
+
+---
+
+### 关键方法详解
+
+#### `Awake()`
+
+- **方法签名**：`protected virtual void Awake()`
+- **功能描述**：MonoBehaviour 的生命周期方法，在脚本实例被创建时调用。通常用于初始化变量或引用。
+- **算法说明**：无复杂算法，主要作为初始化钩子。
+- **调用关系**：由 Unity 引擎在脚本实例化时自动调用。
+
+#### `Start()`
+
+- **方法签名**：`protected virtual void Start()`
+- **功能描述**：MonoBehaviour 的生命周期方法，在脚本首次执行时调用。通常用于初始化脚本逻辑。
+- **算法说明**：无复杂算法，主要作为启动逻辑钩子。
+- **调用关系**：由 Unity 引擎在脚本启动时自动调用。
+
+#### `OnEnable()`
+
+- **方法签名**：`protected virtual void OnEnable()`
+- **功能描述**：MonoBehaviour 的生命周期方法，在脚本被启用时调用。通常用于重新初始化逻辑。
+- **算法说明**：无复杂算法，主要作为启用逻辑钩子。
+- **调用关系**：由 Unity 引擎在脚本启用时自动调用。
+
+#### `OnDisable()`
+
+- **方法签名**：`protected virtual void OnDisable()`
+- **功能描述**：MonoBehaviour 的生命周期方法，在脚本被禁用时调用。通常用于清理资源。
+- **算法说明**：无复杂算法，主要作为禁用逻辑钩子。
+- **调用关系**：由 Unity 引擎在脚本禁用时自动调用。
+
+#### `Update()`
+
+- **方法签名**：`protected virtual void Update()`
+- **功能描述**：MonoBehaviour 的生命周期方法，在每一帧更新时调用。通常用于处理动态逻辑。
+- **算法说明**：无复杂算法，主要作为每帧逻辑钩子。
+- **调用关系**：由 Unity 引擎在每一帧自动调用。
+
+---
+
+### 架构关系图
+
+```mermaid
+classDiagram
+
+  class MonoBehaviour {
+    +void Awake()
+    +void Start()
+    +void OnEnable()
+    +void OnDisable()
+    +void Update()
+  }
+
+  class ResourceInfo {
+    +string id
+    +string resourceName
+    +string resourceDescription
+    +string thumbnailPath
+    +string modelFaces
+    +string itemHeight
+    +Texture2D resourceThumbnail
+    +string prefabPath
+    +string creationDate
+    +string updatedDate
+    +string version
+    +List<string> typeTags
+    +List<string> themeTags
+    +List<string> functionTags
+    +List<string> definitionTags
+    +List<string> batchTags
+    +List<string> propertyTags
+  }
+
+  ResourceInfo --|> MonoBehaviour : Inherits from
+  ResourceInfo *-- List<string> : Contains tags
+  ResourceInfo *-- Texture2D : Contains resource thumbnail
+```
+
+---
+
+### 总结
+
+`ResourceInfo` 类通过存储和管理资源的元数据，在游戏资源管理系统中起到了关键作用。它依赖 Unity 引擎的核心功能，并通过 MonoBehaviour 生命周期方法实现脚本逻辑的初始化和执行。该类的结构设计使其能够灵活地扩展，以适应不同的资源管理需求。

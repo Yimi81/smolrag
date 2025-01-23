@@ -1,0 +1,92 @@
+文件源代码内容如下：
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEngine;
+
+[CustomEditor(typeof(TagLibrary))]
+public class TagLibraryEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        TagLibrary tagLibrary = (TagLibrary)target;
+
+        tagLibrary.category = EditorGUILayout.TextField("Category", tagLibrary.category);
+
+        SerializedProperty tagsProperty = serializedObject.FindProperty("tags");
+        EditorGUILayout.PropertyField(tagsProperty, new GUIContent("Tags"), true);
+
+        serializedObject.ApplyModifiedProperties();
+    }
+}
+#endif
+
+源代码内容解释如下：
+### 代码分析报告
+
+#### 1. 功能概览
+
+- **功能总结**：该代码文件是一个Unity编辑器扩展脚本，实现了对`TagLibrary`类的自定义Inspector面板。它允许用户在Unity编辑器中通过友好的GUI界面编辑`TagLibrary`类的属性。
+- **角色与重要性**：在Unity项目中，该脚本为`TagLibrary`类提供了一个定制的编辑界面，增强了开发体验，方便管理和维护标签数据。这对于需要频繁调整标签的项目尤为重要。
+- **主要特性与技术实现**：
+  - 使用Unity的`EditorGUILayout`创建自定义Inspector。
+  - 支持实时更新`TagLibrary`的属性。
+  - 通过`SerializedProperty`安全地处理序列化数据。
+
+#### 2. 核心类解析
+
+**类名称：TagLibraryEditor**
+
+- **职责说明**：该类负责提供一个自定义的Inspector面板，用于编辑`TagLibrary`类的属性。它通过重写`OnInspectorGUI`方法，实现了对`category`和`tags`属性的可视化编辑。
+- **关键方法清单**：
+  - `public override void OnInspectorGUI()`
+- **继承关系**：
+  ```
+  TagLibraryEditor -> Editor
+  ```
+- **依赖模块**：
+  - `UnityEditor.Editor`（Unity编辑器核心类）
+  - `UnityEngine.Object`（Unity对象基类）
+  - `TagLibrary`（项目内部类）
+
+#### 3. 关键方法详解
+
+**方法名称：OnInspectorGUI**
+
+- **方法签名**：
+  ```csharp
+  public override void OnInspectorGUI()
+  ```
+- **功能描述**：
+  重写`Editor`类的`OnInspectorGUI`方法，用于绘制自定义Inspector界面。具体步骤如下：
+  1. 获取`TagLibrary`实例。
+  2. 使用`EditorGUILayout.TextField`创建一个文本输入框，用于编辑`category`属性。
+  3. 使用`EditorGUILayout.PropertyField`创建一个属性字段，用于编辑`tags`数组。
+  4. 调用`serializedObject.ApplyModifiedProperties()`将修改后的属性应用到`TagLibrary`实例。
+- **算法说明**：
+  该方法利用Unity的`SerializedProperty`机制，确保对序列化属性的修改是安全且高效的。通过`EditorGUILayout`提供的GUI控件，构建了一个直观的编辑界面。
+- **调用关系**：
+  - 该方法由Unity编辑器自动调用，每次Inspector面板更新时执行。
+  - 调用频率：每当Inspector面板刷新或用户与界面交互时。
+
+#### 4. 架构关系图
+
+```mermaid
+classDiagram
+
+  class Editor {
+    +void OnInspectorGUI()
+  }
+
+  class TagLibraryEditor {
+    +void OnInspectorGUI()
+  }
+
+  TagLibraryEditor --> Editor
+  TagLibraryEditor ..> TagLibrary : 依赖
+```
+
+---
+
+### 总结
+
+该代码通过继承`Editor`类并重写`OnInspectorGUI`方法，为`TagLibrary`类提供了一个自定义的Inspector面板。它利用Unity的GUI工具包创建了一个用户友好的编辑界面，支持对`TagLibrary`类的属性进行实时编辑。这种自定义Inspector在需要频繁调整标签数据的项目中非常有用，能够显著提高开发效率。
