@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import logging
+import tiktoken
 import numpy as np
 
 import pandas as pd
@@ -11,6 +12,8 @@ from .prompts import describe_code_prompt
 from functools import wraps
 from dataclasses import dataclass
 from hashlib import md5
+
+ENCODER = None
 
 logger = logging.getLogger("smolrag")
 
@@ -83,8 +86,42 @@ def write_json(json_obj, file_name):
     with open(file_name, "w", encoding="utf-8") as f:
         json.dump(json_obj, f, indent=2, ensure_ascii=False)
 
+
+def compute_args_hash(*args):
+    return md5(str(args).encode()).hexdigest()
+
+
 def compute_mdhash_id(content, prefix: str = ""):
     return prefix + md5(content.encode()).hexdigest()
+
+
+def encode_string_by_tiktoken(content: str, model_name: str = "gpt-4o"):
+    global ENCODER
+    if ENCODER is None:
+        ENCODER = tiktoken.encoding_for_model(model_name)
+    tokens = ENCODER.encode(content)
+    return tokens
+
+
+def decode_tokens_by_tiktoken(tokens: list[int], model_name: str = "gpt-4o"):
+    global ENCODER
+    if ENCODER is None:
+        ENCODER = tiktoken.encoding_for_model(model_name)
+    content = ENCODER.decode(tokens)
+    return content
+
+
+def truncate_list_by_token_size(list_data: list, key: callable, max_token_size: int):
+    """Truncate a list of data by token size"""
+    if max_token_size <= 0:
+        return []
+    tokens = 0
+    for i, data in enumerate(list_data):
+        tokens += len(encode_string_by_tiktoken(key(data)))
+        if tokens > max_token_size:
+            return list_data[:i]
+    return list_data
+
 
 def load_data():
     data = pd.read_csv("data/zt_resource.csv", encoding="utf-8")

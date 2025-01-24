@@ -14,6 +14,24 @@ T = TypeVar("T")
 
 
 @dataclass
+class QueryParam:
+    mode: Literal["light", "naive", "mini"] = "mini"
+    only_need_context: bool = False
+    response_type: str = "Multiple Paragraphs"
+    # Number of top-k items to retrieve; corresponds to entities in "local" mode and relationships in "global" mode.
+    top_k: int = 5
+    # Number of tokens for the original chunks.
+    max_token_for_text_unit: int = 2000
+    # Number of tokens for the relationship descriptions
+    max_token_for_global_context: int = 2000
+    # Number of tokens for the entity descriptions
+    max_token_for_local_context: int = 2000  # For Light/Graph
+    max_token_for_node_context: int = (
+        500  # For Mini, if too long, SLM may be fail to generate any response
+    )
+
+
+@dataclass
 class StorageNameSpace:
     namespace: str
     global_config: dict

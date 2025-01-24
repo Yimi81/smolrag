@@ -1,0 +1,174 @@
+2025-01-23 10:38:16,780 - smolrag - INFO - Logger initialized for working directory: ./ZTResource
+2025-01-23 10:38:16,781 - smolrag - INFO - Load KV llm_response_cache with 0 data
+2025-01-23 10:38:16,781 - smolrag - INFO - Load KV full_docs with 0 data
+2025-01-23 10:38:16,781 - smolrag - INFO - Load KV text_chunks with 0 data
+2025-01-23 10:38:47,874 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:28,916 - smolrag - INFO - Logger initialized for working directory: ./ZTResource
+2025-01-23 10:39:28,917 - smolrag - INFO - Load KV llm_response_cache with 0 data
+2025-01-23 10:39:28,917 - smolrag - INFO - Load KV full_docs with 0 data
+2025-01-23 10:39:28,917 - smolrag - INFO - Load KV text_chunks with 0 data
+2025-01-23 10:39:28,920 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:33,370 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:33,370 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:33,729 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:33,731 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:33,731 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:34,219 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:34,221 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:34,221 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:34,459 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:34,461 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:34,461 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:34,724 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:34,726 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:34,726 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:35,000 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:35,002 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:35,002 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:35,225 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:35,227 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:35,227 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:35,511 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:35,513 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:35,514 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:35,757 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:35,759 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:35,759 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:35,996 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:35,999 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:36,000 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:36,353 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:36,355 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:36,355 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:36,595 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:36,598 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:36,599 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:37,177 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:37,181 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:37,182 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:37,741 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:37,745 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:37,745 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:38,343 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:38,345 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:38,345 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:38,614 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:38,618 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:38,618 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:39,026 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:39,039 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:39,039 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:39,710 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:39,714 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:39,714 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:39,974 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:39,979 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:39,979 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:40,300 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:40,307 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:40,307 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:40,679 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:40,683 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:40,683 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:41,065 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:41,068 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:41,068 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:41,493 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:41,495 - smolrag - INFO - [New Chunks] inserting 1 chunks
+2025-01-23 10:39:41,495 - smolrag - INFO - Inserting 1 vectors to chunks
+2025-01-23 10:39:41,597 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:41,599 - smolrag - INFO - [New Chunks] inserting 1 chunks
+2025-01-23 10:39:41,599 - smolrag - INFO - Inserting 1 vectors to chunks
+2025-01-23 10:39:41,709 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:41,711 - smolrag - INFO - [New Chunks] inserting 1 chunks
+2025-01-23 10:39:41,711 - smolrag - INFO - Inserting 1 vectors to chunks
+2025-01-23 10:39:41,843 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:41,845 - smolrag - INFO - [New Chunks] inserting 1 chunks
+2025-01-23 10:39:41,845 - smolrag - INFO - Inserting 1 vectors to chunks
+2025-01-23 10:39:41,992 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:41,998 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:41,998 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:42,539 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:42,541 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:42,541 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:42,791 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:42,795 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:42,795 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:43,133 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:43,136 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:43,137 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:43,411 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:43,413 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:43,413 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:43,692 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:43,698 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:43,698 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:44,381 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:44,383 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:44,383 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:44,643 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:44,647 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:44,647 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:45,101 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:45,106 - smolrag - INFO - [New Chunks] inserting 5 chunks
+2025-01-23 10:39:45,106 - smolrag - INFO - Inserting 5 vectors to chunks
+2025-01-23 10:39:45,737 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:45,741 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:45,741 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:46,272 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:46,276 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:46,276 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:46,628 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:46,630 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:46,630 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:46,883 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:46,886 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:46,886 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:47,309 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:47,312 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:47,312 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:47,774 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:47,777 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:47,777 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:48,263 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:48,267 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:48,267 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:48,945 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:48,949 - smolrag - INFO - [New Chunks] inserting 4 chunks
+2025-01-23 10:39:48,949 - smolrag - INFO - Inserting 4 vectors to chunks
+2025-01-23 10:39:49,440 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:49,441 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:49,441 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:49,696 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:49,698 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:49,698 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:50,060 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:50,062 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:50,062 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:50,319 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:50,322 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:50,322 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:50,714 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:50,716 - smolrag - INFO - [New Chunks] inserting 3 chunks
+2025-01-23 10:39:50,716 - smolrag - INFO - Inserting 3 vectors to chunks
+2025-01-23 10:39:51,073 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:51,075 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:51,075 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-23 10:39:51,345 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:51,347 - smolrag - INFO - [New Chunks] inserting 1 chunks
+2025-01-23 10:39:51,347 - smolrag - INFO - Inserting 1 vectors to chunks
+2025-01-23 10:39:51,492 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:51,493 - smolrag - INFO - [New Chunks] inserting 1 chunks
+2025-01-23 10:39:51,493 - smolrag - INFO - Inserting 1 vectors to chunks
+2025-01-23 10:39:51,636 - smolrag - INFO - [New Docs] inserting 1 docs
+2025-01-23 10:39:51,638 - smolrag - INFO - [New Chunks] inserting 2 chunks
+2025-01-23 10:39:51,638 - smolrag - INFO - Inserting 2 vectors to chunks
+2025-01-24 09:10:13,639 - smolrag - INFO - Logger initialized for working directory: ./ZTResource
+2025-01-24 09:10:13,640 - smolrag - INFO - Load KV llm_response_cache with 0 data
+2025-01-24 09:10:13,642 - smolrag - INFO - Load KV full_docs with 52 data
+2025-01-24 09:10:13,645 - smolrag - INFO - Load KV text_chunks with 133 data
+2025-01-24 09:13:17,621 - smolrag - INFO - Logger initialized for working directory: ./ZTResource
+2025-01-24 09:13:17,622 - smolrag - INFO - Load KV llm_response_cache with 0 data
+2025-01-24 09:13:17,625 - smolrag - INFO - Load KV full_docs with 52 data
+2025-01-24 09:13:17,628 - smolrag - INFO - Load KV text_chunks with 133 data
+2025-01-24 09:13:18,074 - smolrag - INFO - Truncate 5 to 1 chunks
